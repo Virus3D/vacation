@@ -37,7 +37,18 @@ class VacationController extends AbstractController
                 ->getVacationDaysCount($vacation->getStartDate(), $vacation->getEndDate());
         }
 
-        $form = $this->createForm(VacationType::class);
+        $workYears = $this->vacationManager->getWorkYears($employee);
+        $workYearChoices = [];
+        foreach ($workYears as $index => $wy) {
+            $label = 'Год ' . $wy['year_number'] . ' (' . $wy['start_date']->format('d.m.Y') . ' - ' . $wy['end_date']->format('d.m.Y') . ')';
+            $workYearChoices[$label] = $index;
+        }
+
+        $form = $this->createForm(
+            VacationType::class,
+            null,
+            ['work_years_choices' => $workYearChoices]
+        );
         $form->handleRequest($request);
 
         $calculationResult = null;
@@ -53,16 +64,60 @@ class VacationController extends AbstractController
                     $startDate,
                     $endDate
                 );
-            } elseif ($form->get('add')->isClicked()) {
-                $result = $this->vacationManager->addVacation($employee, $startDate, $endDate);
-
-                if ($result['success']) {
-                    $this->addFlash('success', 'Отпуск успешно добавлен!');
-                    return $this->redirectToRoute('app_vacation_show', ['id' => $employee->getId()]);
+            } elseif ($form->get('save')->isClicked()) {
+                if ($data['auto_calculate']) {
+                    $result = $this->vacationManager->addVacation($employee, $startDate, $endDate);
+                    if ($result['success']) {
+                        $this->addFlash('success', 'Отпуск успешно добавлен (автоматический расчёт).');
+                        return $this->redirectToRoute('app_vacation_show', ['id' => $employee->getId()]);
+                    } else {
+                        $this->addFlash('error', $result['error']);
+                    }
                 } else {
-                    $this->addFlash('error', $result['error']);
-                }
-            }
+                    // Ручное распределение
+                    $manualDetails = [];
+                    $detailsForm = $form->get('details');
+                    foreach ($detailsForm as $detailForm) {
+                        $workYearIndex = $detailForm->get('workYear')->getData();
+                        $vacationType = $detailForm->get('vacationType')->getData();
+                        $daysUsed = $detailForm->get('daysUsed')->getData();
+
+                        if ($workYearIndex === null || $vacationType === null || $daysUsed === null) {
+                            continue;
+                        }
+
+                        if (!isset($workYears[$workYearIndex])) {
+                            $this->addFlash('error', 'Неверный выбор рабочего года.');
+                            break;
+                        }
+
+                        $year = $workYears[$workYearIndex];
+                        $manualDetails[] = [
+                            'workYearStart' => $year['start_date'],
+                            'workYearEnd'   => $year['end_date'],
+                            'vacationType'  => $vacationType,
+                            'daysUsed'      => $daysUsed,
+                        ];
+                    }// end foreach
+
+                    if (empty($manualDetails)) {
+                        $this->addFlash('error', 'Добавьте хотя бы одну строку распределения дней.');
+                    } else {
+                        $result = $this->vacationManager->addVacationWithManualDetails(
+                            $employee,
+                            $startDate,
+                            $endDate,
+                            $manualDetails
+                        );
+                        if ($result['success']) {
+                            $this->addFlash('success', 'Отпуск успешно добавлен (ручное распределение).');
+                            return $this->redirectToRoute('app_vacation_show', ['id' => $employee->getId()]);
+                        } else {
+                            $this->addFlash('error', $result['error']);
+                        }
+                    }
+                }// end if
+            }// end if
         }// end if
 
         return $this->render(

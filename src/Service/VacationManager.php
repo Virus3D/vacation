@@ -256,4 +256,109 @@ class VacationManager
 
         return $totalDays - $holidaysCount;
     }// end getVacationDaysCount()
+
+    public function addVacationWithManualDetails(
+        Employee $employee,
+        \DateTimeInterface $startDate,
+        \DateTimeInterface $endDate,
+        array $manualDetails
+    ): array {
+        // Валидация и проверка остатков.
+        $errors = [];
+        // временный учёт уже распределённых дней в этом запросе.
+        $usedCombined = [];
+
+        foreach ($manualDetails as $detail) {
+            $yearStart = $detail['workYearStart'];
+            $yearEnd = $detail['workYearEnd'];
+            $type = $detail['vacationType'];
+            $days = $detail['daysUsed'];
+
+            if ($days <= 0) {
+                $errors[] = 'Количество дней должно быть положительным.';
+                continue;
+            }
+
+            $available = $this->getAvailableDaysForYear($employee, $yearStart, $yearEnd, $type);
+
+            // Учитываем уже добавленные в этом запросе дни для того же года и типа
+            $key = $yearStart->format('Y-m-d') . '|' . $yearEnd->format('Y-m-d') . '|' . $type;
+            $alreadyUsed = $usedCombined[$key] ?? 0;
+            $remaining = $available - $alreadyUsed;
+
+            if ($days > $remaining) {
+                $errors[] = sprintf(
+                    'Для периода %s - %s (%s) доступно только %d дней, а запрошено %d.',
+                    $yearStart->format('d.m.Y'),
+                    $yearEnd->format('d.m.Y'),
+                    $type === 'main' ? 'основной' : 'дополнительный',
+                    max(0, $remaining),
+                    $days
+                );
+            } else {
+                $usedCombined[$key] = $alreadyUsed + $days;
+            }
+        }// end foreach
+
+        if (!empty($errors)) {
+            return [
+                'success' => false,
+                'error'   => implode(' ', $errors),
+            ];
+        }
+
+        // Сохранение
+        $this->entityManager->beginTransaction();
+        try {
+            $vacation = new Vacation();
+            $vacation->setEmployee($employee);
+            $vacation->setStartDate($startDate);
+            $vacation->setEndDate($endDate);
+            $this->entityManager->persist($vacation);
+
+            foreach ($manualDetails as $detail) {
+                $vacationDetail = new VacationDetail();
+                $vacationDetail->setVacation($vacation);
+                $vacationDetail->setWorkYearStart($detail['workYearStart']);
+                $vacationDetail->setWorkYearEnd($detail['workYearEnd']);
+                $vacationDetail->setDaysUsed($detail['daysUsed']);
+                $vacationDetail->setVacationType($detail['vacationType']);
+                $this->entityManager->persist($vacationDetail);
+            }
+
+            $this->entityManager->flush();
+            $this->entityManager->commit();
+            return ['success' => true];
+        } catch (\Exception $e) {
+            $this->entityManager->rollback();
+            return [
+                'success' => false,
+                'error'   => 'Ошибка сохранения: ' . $e->getMessage(),
+            ];
+        }// end try
+    }// end addVacationWithManualDetails()
+
+    private function getAvailableDaysForYear(
+        Employee $employee,
+        \DateTimeInterface $yearStart,
+        \DateTimeInterface $yearEnd,
+        string $type
+    ): int {
+        $workYears = $this->getWorkYears($employee);
+        foreach ($workYears as $year) {
+            if ($year['start_date'] == $yearStart && $year['end_date'] == $yearEnd) {
+                $usedDays = $this->vacationDetailRepository->getUsedDaysByYear(
+                    $employee->getId(),
+                    $yearStart,
+                    $yearEnd
+                );
+                if ($type === 'main') {
+                    return max(0, $year['main_days'] - $usedDays['main']);
+                } else {
+                    return max(0, $year['additional_days'] - $usedDays['additional']);
+                }
+            }
+        }
+        return 0;
+    }// end getAvailableDaysForYear()
 }// end class

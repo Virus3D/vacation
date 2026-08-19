@@ -70,21 +70,35 @@
         <div class="card-body">
             {{ form_start(form) }}
                 <div class="row">
-                    <div class="col-md-5">
-                        {{ form_row(form.startDate) }}
-                    </div>
-                    <div class="col-md-5">
-                        {{ form_row(form.endDate) }}
-                    </div>
-                    <div class="col-md-2">
-                        <label>&nbsp;</label>
-                        <div>
-                            {{ form_widget(form.calculate) }}
-                        </div>
-                    </div>
+                    <div class="col-md-5">{{ form_row(form.startDate) }}</div>
+                    <div class="col-md-5">{{ form_row(form.endDate) }}</div>
                 </div>
-                <div class="mt-2">
-                    {{ form_widget(form.add) }}
+                <div class="form-check mb-3">
+                    {{ form_widget(form.auto_calculate) }}
+                    {{ form_label(form.auto_calculate) }}
+                </div>
+                <div id="manual-details" style="display: none;">
+                    <h5>Ручное распределение дней</h5>
+                    <div class="d-none">
+                        <div id="prototype-workYear" data-prototype="{{ form_widget(form.details.vars.prototype.workYear)|e('html_attr') }}"></div>
+                        <div id="prototype-vacationType" data-prototype="{{ form_widget(form.details.vars.prototype.vacationType)|e('html_attr') }}"></div>
+                        <div id="prototype-daysUsed" data-prototype="{{ form_widget(form.details.vars.prototype.daysUsed)|e('html_attr') }}"></div>
+                    </div>
+                    <div id="vacation-details">
+                        {% for detail in form.details %}
+                            <div class="detail-row mb-2 row align-items-end">
+                                <div class="col">{{ form_widget(detail.workYear) }}</div>
+                                <div class="col">{{ form_widget(detail.vacationType) }}</div>
+                                <div class="col">{{ form_widget(detail.daysUsed) }}</div>
+                                <div class="col-auto"><button type="button" class="btn btn-danger btn-sm remove-detail">Удалить</button></div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm add-detail">Добавить строку</button>
+                </div>
+                <div class="mt-3">
+                    {{ form_widget(form.calculate) }}
+                    {{ form_widget(form.save) }}
                 </div>
             {{ form_end(form) }}
 
@@ -153,4 +167,79 @@
     <div class="mt-3">
         <a href="{{ path('app_employee_index') }}" class="btn btn-outline-secondary">Назад к списку</a>
     </div>
+{% endblock %}
+{% block javascripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const autoCheckbox = document.querySelector('.auto-calculate-checkbox');
+            const manualBlock = document.getElementById('manual-details');
+            const detailsContainer = document.getElementById('vacation-details');
+            const addButton = document.querySelector('.add-detail');
+
+            function toggleManual() {
+                if (autoCheckbox.checked) {
+                    manualBlock.style.display = 'none';
+                } else {
+                    manualBlock.style.display = 'block';
+                }
+            }
+
+            if (autoCheckbox) {
+                autoCheckbox.addEventListener('change', toggleManual);
+                toggleManual();
+            }
+
+            let index = detailsContainer.children.length;
+
+            addButton.addEventListener('click', function() {
+                // Получаем прототипы отдельных полей
+                const workYearPrototype = document.getElementById('prototype-workYear').dataset.prototype;
+                const vacationTypePrototype = document.getElementById('prototype-vacationType').dataset.prototype;
+                const daysUsedPrototype = document.getElementById('prototype-daysUsed').dataset.prototype;
+
+                // Заменяем __name__ на текущий индекс
+                const workYearHtml = workYearPrototype.replace(/__name__/g, index);
+                const vacationTypeHtml = vacationTypePrototype.replace(/__name__/g, index);
+                const daysUsedHtml = daysUsedPrototype.replace(/__name__/g, index);
+
+                // Создаём строку с колонками
+                const row = document.createElement('div');
+                row.className = 'detail-row mb-2 row align-items-end';
+
+                const col1 = document.createElement('div');
+                col1.className = 'col';
+                col1.innerHTML = workYearHtml;
+
+                const col2 = document.createElement('div');
+                col2.className = 'col';
+                col2.innerHTML = vacationTypeHtml;
+
+                const col3 = document.createElement('div');
+                col3.className = 'col';
+                col3.innerHTML = daysUsedHtml;
+
+                const col4 = document.createElement('div');
+                col4.className = 'col-auto';
+                col4.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-detail">Удалить</button>';
+
+                row.appendChild(col1);
+                row.appendChild(col2);
+                row.appendChild(col3);
+                row.appendChild(col4);
+
+                detailsContainer.appendChild(row);
+                index++;
+
+                // Переинициализация datepicker, если необходимо
+                flatpickr('.datepicker', { dateFormat: 'd.m.Y', allowInput: true, locale: 'ru' });
+            });
+
+            // Удаление строк
+            detailsContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-detail')) {
+                    e.target.closest('.detail-row').remove();
+                }
+            });
+        });
+    </script>
 {% endblock %}
