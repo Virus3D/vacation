@@ -56,10 +56,12 @@ class VacationManager
                 // Пропорциональный расчёт дней
                 $mainDays = (int) floor($employee->getBaseVacationDays() * $monthsWorked / 12);
                 $seniorityDays = (int) floor($seniorityAdditionalDays * $monthsWorked / 12);
+                $fixedDays = (int) floor($fixedAdditionalDays * $monthsWorked / 12);
             } else {
                 // Для завершённых (прошлых) лет – полные дни
                 $mainDays = $employee->getBaseVacationDays();
                 $seniorityDays = $seniorityAdditionalDays;
+                $fixedDays = $fixedAdditionalDays;
             }
 
             $workYears[] = [
@@ -68,9 +70,9 @@ class VacationManager
                 'end_date'        => clone $yearEnd,
                 'main_days'       => $mainDays,
                 'seniority_days'  => $seniorityDays,
-                'fixed_days'      => $fixedAdditionalDays,
-                'additional_days' => $seniorityDays + $fixedAdditionalDays,
-                'total_days'      => $employee->getBaseVacationDays() + $seniorityDays + $fixedAdditionalDays,
+                'fixed_days'      => $fixedDays,
+                'additional_days' => $seniorityDays + $fixedDays,
+                'total_days'      => $employee->getBaseVacationDays() + $seniorityDays + $fixedDays,
             ];
 
             $yearStart->modify('+1 year');
