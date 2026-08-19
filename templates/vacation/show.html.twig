@@ -1,0 +1,156 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Отпуска {{ employee.fullName }}{% endblock %}
+
+{% block body %}
+    <h1 class="mb-4">{{ employee.fullName }}</h1>
+    <p class="text-muted">Дата трудоустройства: {{ employee.hireDate|date('d.m.Y') }}</p>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <h3>{{ remainingDays.main }}</h3>
+                    <p class="text-muted">Основной отпуск</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <h3>{{ remainingDays.additional }}</h3>
+                    <p class="text-muted">Дополнительный отпуск</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <h3>{{ remainingDays.total }}</h3>
+                    <p class="text-muted">Всего доступно</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Детализация по рабочим годам</h5>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Год работы</th>
+                        <th>Период</th>
+                        <th>Основной (остаток)</th>
+                        <th>Дополнительный (остаток)</th>
+                        <th>Всего (остаток)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detail in remainingDays.details %}
+                        <tr>
+                            <td>{{ detail.year_number }}</td>
+                            <td>{{ detail.period }}</td>
+                            <td>{{ detail.main_remaining }}</td>
+                            <td>{{ detail.additional_remaining }}</td>
+                            <td>{{ detail.total_remaining }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Новый отпуск</h5>
+        </div>
+        <div class="card-body">
+            {{ form_start(form) }}
+                <div class="row">
+                    <div class="col-md-5">
+                        {{ form_row(form.startDate) }}
+                    </div>
+                    <div class="col-md-5">
+                        {{ form_row(form.endDate) }}
+                    </div>
+                    <div class="col-md-2">
+                        <label>&nbsp;</label>
+                        <div>
+                            {{ form_widget(form.calculate) }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    {{ form_widget(form.add) }}
+                </div>
+            {{ form_end(form) }}
+
+            {% if calculationResult %}
+                <div class="alert alert-info mt-3">
+                    <h6>Результат расчета:</h6>
+                    <p>Общее количество дней: {{ calculationResult.total_days }}</p>
+
+                    {% if calculationResult.usage_details|length > 0 %}
+                        <h6>Использование дней:</h6>
+                        <ul>
+                            {% for usage in calculationResult.usage_details %}
+                                <li>
+                                    Рабочий год {{ usage.work_year }}
+                                    ({{ usage.period }}):
+                                    {{ usage.days }} дней
+                                    ({{ usage.type == 'main' ? 'основной' : 'дополнительный' }})
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {% if calculationResult.insufficient_days > 0 %}
+                        <div class="alert alert-danger">
+                            Недостаточно дней! Не хватает: {{ calculationResult.insufficient_days }} дней
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">История отпусков</h5>
+        </div>
+        <div class="card-body">
+            {% if vacations|length > 0 %}
+                {% for vacation in vacations %}
+                    <div class="vacation-details mb-3">
+                        <strong>Период:</strong>
+                        {{ vacation.startDate|date('d.m.Y') }} - {{ vacation.endDate|date('d.m.Y') }}
+                        ({{ vacation.totalDays }} дней)
+                        ({{ vacationDaysExcludingHolidays[vacation.id] }} дней без учёта праздников)
+
+                        <div class="mt-2">
+                            <strong>Использование:</strong>
+                            <ul class="mb-0">
+                                {% for detail in vacation.vacationDetails %}
+                                    <li>
+                                        Рабочий год: {{ detail.workYearStart|date('d.m.Y') }} - {{ detail.workYearEnd|date('d.m.Y') }}
+                                        | {{ detail.daysUsed }} дней
+                                        | {{ detail.vacationType == 'main' ? 'Основной' : 'Дополнительный' }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-muted">История отпусков отсутствует</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a href="{{ path('app_employee_index') }}" class="btn btn-outline-secondary">Назад к списку</a>
+    </div>
+{% endblock %}

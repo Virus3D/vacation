@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang='ru'>
+    <head>
+        <meta charset="UTF-8">
+        <title>{% block title %}Система управления отпусками{% endblock %}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+        <style>
+            body { background-color: #f8f9fa; }
+            .container { max-width: 1200px; }
+            .card { margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+            .stat-card { text-align: center; padding: 20px; }
+            .stat-card h3 { font-size: 2.5em; color: #007bff; margin: 10px 0; }
+            .vacation-details { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 10px; }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+            <div class="container">
+                <a class="navbar-brand" href="{{ path('app_employee_index') }}">Отпуска</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ path('app_employee_index') }}">Сотрудники</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ path('app_employee_new') }}">Добавить сотрудника</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            {% for label, messages in app.flashes %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+
+            {% block body %}{% endblock %}
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- Flatpickr JS -->
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <!-- Русская локаль -->
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                flatpickr.localize(flatpickr.l10ns.ru);
+                flatpickr('.datepicker', {
+                    dateFormat: 'd.m.Y',
+                    allowInput: true,
+                    locale: 'ru'
+                });
+            });
+        </script>
+    </body>
+</html>

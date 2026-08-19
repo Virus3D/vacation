@@ -1,0 +1,63 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Редактировать сотрудника{% endblock %}
+
+{% block body %}
+    <h1 class="mb-4">Редактировать сотрудника</h1>
+
+    <div class="card">
+        <div class="card-body">
+            {{ form_start(form) }}
+                {{ form_row(form.fullName) }}
+                {{ form_row(form.hireDate) }}
+                {{ form_row(form.baseVacationDays) }}
+                {{ form_row(form.additionalVacationDays) }}
+
+                <h4>Фиксированные дополнительные дни</h4>
+                <div id="vacation-entitlements"
+                     data-prototype="{{ form_widget(form.vacationEntitlements.vars.prototype)|e('html_attr') }}">
+                    {% for entitlement in form.vacationEntitlements %}
+                        <div class="entitlement-row mb-2">
+                            {{ form_widget(entitlement.startDate) }}
+                            {{ form_widget(entitlement.days) }}
+                            <button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>
+                        </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm add-entitlement">Добавить период</button>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <a href="{{ path('app_employee_index') }}" class="btn btn-outline-secondary">Отмена</a>
+                </div>
+            {{ form_end(form) }}
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('vacation-entitlements');
+            const addButton = document.querySelector('.add-entitlement');
+            let index = container.children.length;
+
+            addButton.addEventListener('click', function() {
+                const prototype = container.dataset.prototype;
+                const newForm = prototype.replace(/__name__/g, index);
+                const div = document.createElement('div');
+                div.className = 'entitlement-row mb-2';
+                div.innerHTML = newForm + '<button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>';
+                container.appendChild(div);
+                index++;
+                flatpickr('.datepicker', { dateFormat: 'd.m.Y', allowInput: true, locale: 'ru' });
+            });
+
+            container.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-entitlement')) {
+                    e.target.closest('.entitlement-row').remove();
+                }
+            });
+        });
+    </script>
+{% endblock %}

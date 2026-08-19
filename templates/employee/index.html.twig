@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Сотрудники{% endblock %}
+
+{% block body %}
+    <h1 class="mb-4">Сотрудники</h1>
+
+    <div class="row">
+        {% for employee in employees %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ employee.fullName }}</h5>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                Принят: {{ employee.hireDate|date('d.m.Y') }}
+                            </small>
+                        </p>
+                        <p class="card-text">
+                            Основной отпуск: {{ employee.baseVacationDays }} дней<br>
+                            Дополнительный: {{ employee.additionalVacationDays }} дней
+                        </p>
+                        <a href="{{ path('app_vacation_show', {'id': employee.id}) }}" class="btn btn-primary">
+                            Управлять отпусками
+                        </a>
+                        <a href="{{ path('app_employee_edit', {'id': employee.id}) }}" class="btn btn-outline-secondary">
+                            Редактировать
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    Сотрудники не найдены. <a href="{{ path('app_employee_new') }}">Добавить первого сотрудника</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

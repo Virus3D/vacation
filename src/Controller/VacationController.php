@@ -1,0 +1,80 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller;
+
+use App\Entity\Employee;
+use App\Form\VacationType;
+use App\Service\VacationManager;
+use App\Repository\EmployeeRepository;
+use App\Repository\VacationRepository;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
+#[Route('/vacation')]
+class VacationController extends AbstractController
+{
+    public function __construct(
+        private VacationManager $vacationManager
+    ) {
+    }// end __construct()
+
+    #[Route('/{id}', name: 'app_vacation_show', methods: ['GET', 'POST'])]
+    public function show(
+        Employee $employee,
+        Request $request,
+        VacationRepository $vacationRepository
+    ): Response {
+        $remainingDays = $this->vacationManager->getRemainingDays($employee);
+        $vacations = $vacationRepository->findByEmployeeOrderedByDate($employee->getId());
+        $vacationDaysExcludingHolidays = [];
+
+        foreach ($vacations as $vacation) {
+            $vacationDaysExcludingHolidays[$vacation->getId()] = $this->vacationManager
+                ->getVacationDaysCount($vacation->getStartDate(), $vacation->getEndDate());
+        }
+
+        $form = $this->createForm(VacationType::class);
+        $form->handleRequest($request);
+
+        $calculationResult = null;
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $data = $form->getData();
+            $startDate = $data['startDate'];
+            $endDate = $data['endDate'];
+
+            if ($form->get('calculate')->isClicked()) {
+                $calculationResult = $this->vacationManager->calculateVacationUsage(
+                    $employee,
+                    $startDate,
+                    $endDate
+                );
+            } elseif ($form->get('add')->isClicked()) {
+                $result = $this->vacationManager->addVacation($employee, $startDate, $endDate);
+
+                if ($result['success']) {
+                    $this->addFlash('success', 'Отпуск успешно добавлен!');
+                    return $this->redirectToRoute('app_vacation_show', ['id' => $employee->getId()]);
+                } else {
+                    $this->addFlash('error', $result['error']);
+                }
+            }
+        }// end if
+
+        return $this->render(
+            'vacation/show.html.twig',
+            [
+                'employee'                      => $employee,
+                'remainingDays'                 => $remainingDays,
+                'vacations'                     => $vacations,
+                'form'                          => $form->createView(),
+                'calculationResult'             => $calculationResult,
+                'vacationDaysExcludingHolidays' => $vacationDaysExcludingHolidays,
+            ]
+        );
+    }// end show()
+}// end class
