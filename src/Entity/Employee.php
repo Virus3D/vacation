@@ -32,7 +32,15 @@ class Employee
     #[ORM\OneToMany(mappedBy: 'employee', targetEntity: Vacation::class, cascade: ['persist', 'remove'])]
     private Collection $vacations;
 
-    #[ORM\OneToMany(mappedBy: 'employee', targetEntity: VacationEntitlement::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(
+        mappedBy: 'employee',
+        targetEntity: VacationEntitlement::class,
+        cascade: [
+            'persist',
+            'remove',
+        ],
+        orphanRemoval: true
+    )]
     private Collection $vacationEntitlements;
 
     public function __construct()
@@ -98,6 +106,9 @@ class Employee
         return $this->vacations;
     }// end getVacations()
 
+    /**
+     * Добавить отпуск.
+     */
     public function addVacation(Vacation $vacation): static
     {
         if (!$this->vacations->contains($vacation)) {
@@ -107,6 +118,9 @@ class Employee
         return $this;
     }// end addVacation()
 
+    /**
+     * Удаляет отпуск сотрудника.
+     */
     public function removeVacation(Vacation $vacation): static
     {
         if ($this->vacations->removeElement($vacation)) {
@@ -125,6 +139,9 @@ class Employee
         return $this->vacationEntitlements;
     }// end getVacationEntitlements()
 
+    /**
+     * Добавить отпуск.
+     */
     public function addVacationEntitlement(VacationEntitlement $entitlement): static
     {
         if (!$this->vacationEntitlements->contains($entitlement)) {
@@ -134,6 +151,9 @@ class Employee
         return $this;
     }// end addVacationEntitlement()
 
+    /**
+     * Удаляет отпуск сотрудника.
+     */
     public function removeVacationEntitlement(VacationEntitlement $entitlement): static
     {
         if ($this->vacationEntitlements->removeElement($entitlement)) {
@@ -152,14 +172,13 @@ class Employee
         $days = 0;
         foreach ($this->vacationEntitlements as $entitlement) {
             if ($entitlement->getStartDate() <= $date) {
+                // Берём последнее по дате.
                 $days = $entitlement->getDays();
-// берём последнее по дате
             } else {
                 break;
-// т.к. коллекция не гарантирует сортировку, лучше отсортировать
             }
         }
-        // Альтернативно: отсортировать коллекцию по startDate и взять последнюю <= date
+        // Альтернативно: отсортировать коллекцию по startDate и взять последнюю <= date.
         return $days;
     }// end getFixedAdditionalDaysForDate()
 }// end class

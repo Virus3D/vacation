@@ -15,6 +15,11 @@ class VacationRepository extends ServiceEntityRepository
         parent::__construct($registry, Vacation::class);
     }// end __construct()
 
+    /**
+     * Получить все отпуска пользователя.
+     *
+     * @return Vacation[]
+     */
     public function findByEmployeeOrderedByDate(int $employeeId): array
     {
         return $this->createQueryBuilder('v')

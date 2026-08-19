@@ -15,6 +15,11 @@ class VacationDetailRepository extends ServiceEntityRepository
         parent::__construct($registry, VacationDetail::class);
     }// end __construct()
 
+    /**
+     * Исползуемые дни в году.
+     *
+     * @return array<string, int>
+     */
     public function getUsedDaysByYear(int $employeeId, \DateTimeInterface $yearStart, \DateTimeInterface $yearEnd): array
     {
         $startStr = $yearStart->format('Y-m-d');

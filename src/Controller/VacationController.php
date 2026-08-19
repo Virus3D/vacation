@@ -7,7 +7,6 @@ namespace App\Controller;
 use App\Entity\Employee;
 use App\Form\VacationType;
 use App\Service\VacationManager;
-use App\Repository\EmployeeRepository;
 use App\Repository\VacationRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,6 +21,9 @@ class VacationController extends AbstractController
     ) {
     }// end __construct()
 
+    /**
+     * Управление отпусками.
+     */
     #[Route('/{id}', name: 'app_vacation_show', methods: ['GET', 'POST'])]
     public function show(
         Employee $employee,
@@ -40,7 +42,8 @@ class VacationController extends AbstractController
         $workYears = $this->vacationManager->getWorkYears($employee);
         $workYearChoices = [];
         foreach ($workYears as $index => $wy) {
-            $label = 'Год ' . $wy['year_number'] . ' (' . $wy['start_date']->format('d.m.Y') . ' - ' . $wy['end_date']->format('d.m.Y') . ')';
+            $label = 'Год ' . $wy['year_number'] .
+                ' (' . $wy['start_date']->format('d.m.Y') . ' - ' . $wy['end_date']->format('d.m.Y') . ')';
             $workYearChoices[$label] = $index;
         }
 
@@ -74,7 +77,7 @@ class VacationController extends AbstractController
                         $this->addFlash('error', $result['error']);
                     }
                 } else {
-                    // Ручное распределение
+                    // Ручное распределение.
                     $manualDetails = [];
                     $detailsForm = $form->get('details');
                     foreach ($detailsForm as $detailForm) {

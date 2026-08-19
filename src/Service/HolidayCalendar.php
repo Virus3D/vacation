@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use DateTimeInterface;
+
 /**
  * Сервис для работы с праздничными днями (по ТК РФ, без учёта переносов).
  */
@@ -11,7 +13,9 @@ class HolidayCalendar
 {
     /**
      * Список праздничных дней (месяц => дни).
-     * Новогодние каникулы: 1–8 января, 23 февраля, 8 марта, 1 мая, 9 мая, 12 июня, 4 ноября.
+     * Новогодние каникулы: 1, 7 января, 23 февраля, 8 марта, 1 мая, 9 мая, 12 июня, 4 ноября.
+     *
+     * @var int[][]
      */
     private array $holidays = [
         1  => [
@@ -31,7 +35,7 @@ class HolidayCalendar
     /**
      * Проверяет, является ли дата праздничным днём.
      */
-    public function isHoliday(\DateTimeInterface $date): bool
+    public function isHoliday(DateTimeInterface $date): bool
     {
         $month = (int) $date->format('n');
         $day = (int) $date->format('j');
@@ -42,9 +46,9 @@ class HolidayCalendar
     /**
      * Возвращает массив дат праздников, попадающих в диапазон [start; end].
      *
-     * @return \DateTimeInterface[]
+     * @return DateTimeInterface[]
      */
-    public function getHolidaysBetween(\DateTimeInterface $start, \DateTimeInterface $end): array
+    public function getHolidaysBetween(DateTimeInterface $start, DateTimeInterface $end): array
     {
         $holidays = [];
         $current = clone $start;
@@ -63,7 +67,7 @@ class HolidayCalendar
     /**
      * Возвращает количество праздничных дней в диапазоне.
      */
-    public function countHolidaysBetween(\DateTimeInterface $start, \DateTimeInterface $end): int
+    public function countHolidaysBetween(DateTimeInterface $start, DateTimeInterface $end): int
     {
         return count($this->getHolidaysBetween($start, $end));
     }// end countHolidaysBetween()

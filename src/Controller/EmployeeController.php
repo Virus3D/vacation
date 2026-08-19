@@ -15,6 +15,9 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class EmployeeController extends AbstractController
 {
+    /**
+     * Главная страница.
+     */
     #[Route('/', name: 'app_employee_index', methods: ['GET'])]
     public function index(EmployeeRepository $employeeRepository): Response
     {
@@ -26,6 +29,9 @@ class EmployeeController extends AbstractController
         );
     }// end index()
 
+    /**
+     * Добавление нового сотрудника.
+     */
     #[Route('/employee/new', name: 'app_employee_new', methods: ['GET', 'POST'])]
     public function new(Request $request, EntityManagerInterface $entityManager): Response
     {
@@ -49,6 +55,9 @@ class EmployeeController extends AbstractController
         );
     }// end new()
 
+    /**
+     * Редактирование сотрудника.
+     */
     #[Route('/employee/{id}/edit', name: 'app_employee_edit', methods: ['GET', 'POST'])]
     public function edit(Request $request, Employee $employee, EntityManagerInterface $entityManager): Response
     {
@@ -70,6 +79,9 @@ class EmployeeController extends AbstractController
         );
     }// end edit()
 
+    /**
+     * Удаление сотрудника.
+     */
     #[Route('/employee/{id}', name: 'app_employee_delete', methods: ['POST'])]
     public function delete(Request $request, Employee $employee, EntityManagerInterface $entityManager): Response
     {
