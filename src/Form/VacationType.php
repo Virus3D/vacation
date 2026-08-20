@@ -57,7 +57,17 @@ class VacationType extends AbstractType
                     'label'    => 'Автоматически рассчитать использование дней',
                     'required' => false,
                     'data'     => true,
-                    'attr'     => ['class' => 'form-check-input auto-calculate-checkbox'],
+                    'attr'     => ['class' => 'auto-calculate-checkbox'],
+                ]
+            )
+            ->add(
+                'allowAdvance',
+                CheckboxType::class,
+                [
+                    'label'    => 'Разрешить отпуск в долг (авансом)',
+                    'required' => false,
+                    'mapped'   => false,
+                    'attr'     => ['class' => 'allow-advance-checkbox'],
                 ]
             )
             ->add(

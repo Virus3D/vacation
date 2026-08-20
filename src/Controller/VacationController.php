@@ -56,6 +56,8 @@ class VacationController extends AbstractController
 
         $calculationResult = null;
 
+        $allowAdvance = (bool) $form->get('allowAdvance')->getData();
+
         if ($form->isSubmitted() && $form->isValid()) {
             $data = $form->getData();
             $startDate = $data['startDate'];
@@ -65,11 +67,12 @@ class VacationController extends AbstractController
                 $calculationResult = $this->vacationManager->calculateVacationUsage(
                     $employee,
                     $startDate,
-                    $endDate
+                    $endDate,
+                    $allowAdvance
                 );
             } elseif ($form->get('save')->isClicked()) {
                 if ($data['auto_calculate']) {
-                    $result = $this->vacationManager->addVacation($employee, $startDate, $endDate);
+                    $result = $this->vacationManager->addVacation($employee, $startDate, $endDate, $allowAdvance);
                     if ($result['success']) {
                         $this->addFlash('success', 'Отпуск успешно добавлен (автоматический расчёт).');
                         return $this->redirectToRoute('app_vacation_show', ['id' => $employee->getId()]);
@@ -110,7 +113,8 @@ class VacationController extends AbstractController
                             $employee,
                             $startDate,
                             $endDate,
-                            $manualDetails
+                            $manualDetails,
+                            $allowAdvance
                         );
                         if ($result['success']) {
                             $this->addFlash('success', 'Отпуск успешно добавлен (ручное распределение).');

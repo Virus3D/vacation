@@ -27,7 +27,7 @@ class VacationManager
      *
      * @return array<array<mixed>>
      */
-    public function getWorkYears(Employee $employee): array
+    public function getWorkYears(Employee $employee, bool $allowAdvance = false): array
     {
         $hireDate = $employee->getHireDate();
         $today = new \DateTime();
@@ -54,7 +54,7 @@ class VacationManager
             );
 
             // Если год ещё не завершён (текущий рабочий год).
-            if ($yearEnd >= $today && $yearStart <= $today) {
+            if ($yearEnd >= $today && $yearStart <= $today && !$allowAdvance) {
                 // Количество полных отработанных месяцев.
                 $interval = $yearStart->diff($today);
                 $monthsWorked = ($interval->y * 12) + $interval->m;
@@ -124,8 +124,8 @@ class VacationManager
 
             // Учитываем только текущий и прошлые годы.
             if ($today >= $year['start_date']) {
-                $remaining['main'] += max(0, $mainRemaining);
-                $remaining['additional'] += max(0, $additionalRemaining);
+                $remaining['main'] += $mainRemaining;
+                $remaining['additional'] += $additionalRemaining;
             }
         }// end foreach
 
@@ -141,10 +141,11 @@ class VacationManager
     public function calculateVacationUsage(
         Employee $employee,
         DateTimeInterface $startDate,
-        DateTimeInterface $endDate
+        DateTimeInterface $endDate,
+        bool $allowAdvance = false
     ): array {
         $duration = $this->getVacationDaysCount($startDate, $endDate);
-        $workYears = $this->getWorkYears($employee);
+        $workYears = $this->getWorkYears($employee, $allowAdvance);
         $usage = [];
         $daysToUse = $duration;
 
@@ -214,9 +215,13 @@ class VacationManager
      *
      * @return array<string, mixed>
      */
-    public function addVacation(Employee $employee, DateTimeInterface $startDate, DateTimeInterface $endDate): array
-    {
-        $calculation = $this->calculateVacationUsage($employee, $startDate, $endDate);
+    public function addVacation(
+        Employee $employee,
+        DateTimeInterface $startDate,
+        DateTimeInterface $endDate,
+        bool $allowAdvance = false
+    ): array {
+        $calculation = $this->calculateVacationUsage($employee, $startDate, $endDate, $allowAdvance);
 
         if ($calculation['insufficient_days'] > 0) {
             return [
@@ -284,7 +289,8 @@ class VacationManager
         Employee $employee,
         DateTimeInterface $startDate,
         DateTimeInterface $endDate,
-        array $manualDetails
+        array $manualDetails,
+        bool $allowAdvance = false
     ): array {
         // Валидация и проверка остатков.
         $errors = [];
@@ -302,7 +308,7 @@ class VacationManager
                 continue;
             }
 
-            $available = $this->getAvailableDaysForYear($employee, $yearStart, $yearEnd, $type);
+            $available = $this->getAvailableDaysForYear($employee, $yearStart, $yearEnd, $type, $allowAdvance);
 
             // Учитываем уже добавленные в этом запросе дни для того же года и типа.
             $key = $yearStart->format('Y-m-d') . '|' . $yearEnd->format('Y-m-d') . '|' . $type;
@@ -365,9 +371,10 @@ class VacationManager
         Employee $employee,
         DateTimeInterface $yearStart,
         DateTimeInterface $yearEnd,
-        string $type
+        string $type,
+        bool $allowAdvance = false
     ): int {
-        $workYears = $this->getWorkYears($employee);
+        $workYears = $this->getWorkYears($employee, $allowAdvance);
         foreach ($workYears as $year) {
             if ($year['start_date'] == $yearStart && $year['end_date'] == $yearEnd) {
                 $usedDays = $this->vacationDetailRepository->getUsedDaysByYear(
