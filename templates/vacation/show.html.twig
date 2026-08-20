@@ -3,8 +3,15 @@
 {% block title %}Отпуска {{ employee.fullName }}{% endblock %}
 
 {% block body %}
-    <h1 class="mb-4">{{ employee.fullName }}</h1>
-    <p class="text-muted">Дата трудоустройства: {{ employee.hireDate|date('d.m.Y') }}</p>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">{{ employee.fullName }}</h1>
+            <p class="text-muted mb-0">Дата трудоустройства: {{ employee.hireDate|date('d.m.Y') }}</p>
+        </div>
+        <a href="{{ path('app_vacation_plan_new', {'employee': employee.id}) }}" class="btn btn-outline-primary">
+            Запланировать отпуск
+        </a>
+    </div>
 
     <div class="row mb-4">
         <div class="col-md-4">

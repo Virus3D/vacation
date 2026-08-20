@@ -9,6 +9,7 @@ use App\Entity\Vacation;
 use App\Entity\VacationDetail;
 use App\Repository\VacationDetailRepository;
 use App\Repository\VacationEntitlementRepository;
+use App\Repository\VacationPlanRepository;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -18,6 +19,7 @@ class VacationManager
         private EntityManagerInterface $entityManager,
         private VacationDetailRepository $vacationDetailRepository,
         private VacationEntitlementRepository $vacationEntitlementRepository,
+        private VacationPlanRepository $vacationPlanRepository,
         private HolidayCalendar $holidayCalendar
     ) {
     }// end __construct()
@@ -391,4 +393,119 @@ class VacationManager
         }
         return 0;
     }// end getAvailableDaysForYear()
+
+    /**
+     * Рассчитать количество накопленных дней отпуска на указанную дату.
+     *
+     * @return array<string, int>
+     */
+    public function getAccruedDaysOnDate(Employee $employee, DateTimeInterface $date): array
+    {
+        $hireDate = $employee->getHireDate();
+        $target = clone $date;
+        $today = new \DateTime();
+
+        // Если дата раньше даты приёма – нет накоплений.
+        if ($target < $hireDate) {
+            return [
+                'main'       => 0,
+                'additional' => 0,
+                'total'      => 0,
+            ];
+        }
+
+        $workYears = [];
+        $yearStart = clone $hireDate;
+        $yearCounter = 1;
+
+        while ($yearStart <= $target) {
+            $yearEnd = clone $yearStart;
+            $yearEnd->modify('+1 year');
+            $yearEnd->modify('-1 day');
+
+            $seniorityDays = min($yearCounter - 1, $employee->getMaxSeniorityAdditionalDays() ?? 10);
+            $fixedDays = $this->vacationEntitlementRepository->getDaysForEmployeeOnDate(
+                $employee->getId(),
+                min($yearStart, $target)
+            );
+
+            if ($yearEnd >= $target && $yearStart <= $target) {
+                // Текущий (незавершённый на дату) год.
+                $interval = $yearStart->diff($target);
+                $monthsWorked = ($interval->y * 12) + $interval->m;
+                $mainDays = (int) floor($employee->getBaseVacationDays() * $monthsWorked / 12);
+                $seniority = 0;
+                $fixed = (int) floor($fixedDays * $monthsWorked / 12);
+            } else {
+                // Завершённый год.
+                $mainDays = $employee->getBaseVacationDays();
+                $seniority = $seniorityDays;
+                $fixed = $fixedDays;
+            }
+
+            $workYears[] = [
+                'year_number'     => $yearCounter,
+                'start_date'      => clone $yearStart,
+                'end_date'        => clone $yearEnd,
+                'main_days'       => $mainDays,
+                'seniority_days'  => $seniority,
+                'fixed_days'      => $fixed,
+                'additional_days' => $seniority + $fixed,
+                'total_days'      => $mainDays + $seniority + $fixed,
+            ];
+
+            $yearStart->modify('+1 year');
+            $yearCounter++;
+        }// end while
+
+        $accrued = [
+            'main'       => 0,
+            'additional' => 0,
+        ];
+        foreach ($workYears as $year) {
+            $used = $this->vacationDetailRepository->getUsedDaysByYear(
+                $employee->getId(),
+                $year['start_date'],
+                $year['end_date']
+            );
+            $accrued['main'] += max(0, $year['main_days'] - $used['main']);
+            $accrued['additional'] += max(0, $year['additional_days'] - $used['additional']);
+        }
+
+        return [
+            'main'       => $accrued['main'],
+            'additional' => $accrued['additional'],
+            'total'      => $accrued['main'] + $accrued['additional'],
+        ];
+    }// end getAccruedDaysOnDate()
+
+    /**
+     * Рассчитать доступные дни для планирования отпуска на указанную дату (с учётом уже запланированных).
+     *
+     * @return array<string, int>
+     */
+    public function getAvailableDaysForPlanning(Employee $employee, DateTimeInterface $date): array
+    {
+        $accrued = $this->getAccruedDaysOnDate($employee, $date);
+
+        // Вычитаем запланированные отпуска, начинающиеся до указанной даты.
+        $plannedDays = [
+            'main'       => 0,
+            'additional' => 0,
+        ];
+        $plans = $this->vacationPlanRepository->findActivePlansBeforeDate($employee->getId(), $date);
+
+        foreach ($plans as $plan) {
+            // Упрощённо: считаем все дни плана как основные, но можно уточнить по деталям.
+            $plannedDays['main'] += $plan->getTotalDays();
+        }
+
+        $available = [
+            'main'       => max(0, $accrued['main'] - $plannedDays['main']),
+            'additional' => max(0, $accrued['additional'] - $plannedDays['additional']),
+        ];
+        $available['total'] = $available['main'] + $available['additional'];
+
+        return $available;
+    }// end getAvailableDaysForPlanning()
 }// end class
