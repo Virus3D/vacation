@@ -53,9 +53,18 @@
                         <tr>
                             <td>{{ detail.year_number }}</td>
                             <td>{{ detail.period }}</td>
-                            <td>{{ detail.main_remaining }}</td>
-                            <td>{{ detail.additional_remaining }}</td>
-                            <td>{{ detail.total_remaining }}</td>
+                            <td
+                                {% if detail.main_remaining > 0 %}class="text-success fw-bold"{% endif %}
+                                {% if detail.main_remaining < 0 %}class="text-danger fw-bold"{% endif %}
+                            >{{ detail.main_remaining }}</td>
+                            <td
+                                {% if detail.additional_remaining > 0 %}class="text-success fw-bold"{% endif %}
+                                {% if detail.additional_remaining < 0 %}class="text-danger fw-bold"{% endif %}
+                            >{{ detail.additional_remaining }}</td>
+                            <td
+                                {% if detail.total_remaining > 0 %}class="text-success fw-bold"{% endif %}
+                                {% if detail.total_remaining < 0 %}class="text-danger fw-bold"{% endif %}
+                            >{{ detail.total_remaining }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
