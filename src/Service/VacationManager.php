@@ -60,9 +60,9 @@ class VacationManager
                 $monthsWorked = ($interval->y * 12) + $interval->m;
 
                 // Пропорциональный расчёт дней.
-                $mainDays = (int) floor($employee->getBaseVacationDays() * $monthsWorked / 12);
-                $seniorityDays = (int) floor($seniorityAdditionalDays * $monthsWorked / 12);
-                $fixedDays = (int) floor($fixedAdditionalDays * $monthsWorked / 12);
+                $mainDays = (int) ceil($employee->getBaseVacationDays() * $monthsWorked / 12);
+                $seniorityDays = (int) ceil($seniorityAdditionalDays * $monthsWorked / 12);
+                $fixedDays = (int) ceil($fixedAdditionalDays * $monthsWorked / 12);
             } else {
                 // Для завершённых (прошлых) лет – полные дни.
                 $mainDays = $employee->getBaseVacationDays();
