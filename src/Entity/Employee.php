@@ -29,6 +29,9 @@ class Employee
     #[ORM\Column(type: 'integer')]
     private ?int $additionalVacationDays = 0;
 
+    #[ORM\Column(type: 'integer', options: ['default' => 10])]
+    private ?int $maxSeniorityAdditionalDays = 10;
+
     #[ORM\OneToMany(mappedBy: 'employee', targetEntity: Vacation::class, cascade: ['persist', 'remove'])]
     private Collection $vacations;
 
@@ -97,6 +100,17 @@ class Employee
         $this->additionalVacationDays = $additionalVacationDays;
         return $this;
     }// end setAdditionalVacationDays()
+
+    public function getMaxSeniorityAdditionalDays(): ?int
+    {
+        return $this->maxSeniorityAdditionalDays;
+    }// end getMaxSeniorityAdditionalDays()
+
+    public function setMaxSeniorityAdditionalDays(int $maxSeniorityAdditionalDays): static
+    {
+        $this->maxSeniorityAdditionalDays = $maxSeniorityAdditionalDays;
+        return $this;
+    }// end setMaxSeniorityAdditionalDays()
 
     /**
      * @return Collection<int, Vacation>

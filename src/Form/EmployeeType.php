@@ -59,7 +59,18 @@ class EmployeeType extends AbstractType
                 'additionalVacationDays',
                 IntegerType::class,
                 [
-                    'label' => 'Дополнительный отпуск (дней)',
+                    'label' => 'Дополнительный отпуск за стаж (дней)',
+                    'attr'  => [
+                        'class' => 'form-control',
+                        'min'   => 0,
+                    ],
+                ]
+            )
+            ->add(
+                'maxSeniorityAdditionalDays',
+                IntegerType::class,
+                [
+                    'label' => 'Максимум доп. дней за стаж',
                     'attr'  => [
                         'class' => 'form-control',
                         'min'   => 0,

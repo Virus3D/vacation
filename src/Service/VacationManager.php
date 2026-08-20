@@ -42,7 +42,10 @@ class VacationManager
             $yearEnd->modify('-1 day');
 
             // Рассчитываем дополнительные дни (1 день за каждый год, максимум 10).
-            $seniorityAdditionalDays = min($employee->getAdditionalVacationDays() + $yearCounter - 1, 10);
+            $seniorityAdditionalDays = min(
+                $employee->getAdditionalVacationDays() + $yearCounter - 1,
+                $employee->getMaxSeniorityAdditionalDays() ?? 10
+            );
 
             // Фиксированные дополнительные дни, действующие на начало рабочего года.
             $fixedAdditionalDays = $this->vacationEntitlementRepository->getDaysForEmployeeOnDate(
