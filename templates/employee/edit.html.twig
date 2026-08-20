@@ -15,13 +15,23 @@
                 {{ form_row(form.maxSeniorityAdditionalDays) }}
 
                 <h4>Фиксированные дополнительные дни</h4>
-                <div id="vacation-entitlements"
-                     data-prototype="{{ form_widget(form.vacationEntitlements.vars.prototype)|e('html_attr') }}">
+
+                {# Скрытые прототипы полей #}
+                <div class="d-none">
+                    <div id="prototype-entitlement-startDate" 
+                         data-prototype="{{ form_widget(form.vacationEntitlements.vars.prototype.startDate)|e('html_attr') }}"></div>
+                    <div id="prototype-entitlement-days" 
+                         data-prototype="{{ form_widget(form.vacationEntitlements.vars.prototype.days)|e('html_attr') }}"></div>
+                </div>
+
+                <div id="vacation-entitlements">
                     {% for entitlement in form.vacationEntitlements %}
-                        <div class="entitlement-row mb-2">
-                            {{ form_widget(entitlement.startDate) }}
-                            {{ form_widget(entitlement.days) }}
-                            <button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>
+                        <div class="entitlement-row mb-2 row align-items-end">
+                            <div class="col">{{ form_widget(entitlement.startDate) }}</div>
+                            <div class="col">{{ form_widget(entitlement.days) }}</div>
+                            <div class="col-auto">
+                                <button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>
+                            </div>
                         </div>
                     {% endfor %}
                 </div>
@@ -44,16 +54,42 @@
             let index = container.children.length;
 
             addButton.addEventListener('click', function() {
-                const prototype = container.dataset.prototype;
-                const newForm = prototype.replace(/__name__/g, index);
-                const div = document.createElement('div');
-                div.className = 'entitlement-row mb-2';
-                div.innerHTML = newForm + '<button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>';
-                container.appendChild(div);
+                // Получаем прототипы отдельных полей
+                const startDatePrototype = document.getElementById('prototype-entitlement-startDate').dataset.prototype;
+                const daysPrototype = document.getElementById('prototype-entitlement-days').dataset.prototype;
+
+                // Заменяем __name__ на текущий индекс
+                const startDateHtml = startDatePrototype.replace(/__name__/g, index);
+                const daysHtml = daysPrototype.replace(/__name__/g, index);
+
+                // Создаём строку с колонками
+                const row = document.createElement('div');
+                row.className = 'entitlement-row mb-2 row align-items-end';
+
+                const col1 = document.createElement('div');
+                col1.className = 'col';
+                col1.innerHTML = startDateHtml;
+
+                const col2 = document.createElement('div');
+                col2.className = 'col';
+                col2.innerHTML = daysHtml;
+
+                const col3 = document.createElement('div');
+                col3.className = 'col-auto';
+                col3.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>';
+
+                row.appendChild(col1);
+                row.appendChild(col2);
+                row.appendChild(col3);
+
+                container.appendChild(row);
                 index++;
+
+                // Переинициализация flatpickr для новых datepicker
                 flatpickr('.datepicker', { dateFormat: 'd.m.Y', allowInput: true, locale: 'ru' });
             });
 
+            // Удаление строк
             container.addEventListener('click', function(e) {
                 if (e.target.classList.contains('remove-entitlement')) {
                     e.target.closest('.entitlement-row').remove();
