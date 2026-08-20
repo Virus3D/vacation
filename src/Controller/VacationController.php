@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Employee;
+use App\Entity\Vacation;
 use App\Form\VacationType;
 use App\Service\VacationManager;
 use App\Repository\VacationRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -139,4 +141,23 @@ class VacationController extends AbstractController
             ]
         );
     }// end show()
+
+    /**
+     * Удаление отпуска.
+     */
+    #[Route('/{id}/delete', name: 'app_vacation_delete', methods: ['POST'])]
+    public function delete(Request $request, Vacation $vacation, EntityManagerInterface $entityManager): Response
+    {
+        $employeeId = $vacation->getEmployee()->getId();
+
+        if ($this->isCsrfTokenValid('delete' . $vacation->getId(), $request->request->get('_token'))) {
+            $entityManager->remove($vacation);
+            $entityManager->flush();
+            $this->addFlash('success', 'Отпуск удалён.');
+        } else {
+            $this->addFlash('error', 'Недействительный CSRF-токен.');
+        }
+
+        return $this->redirectToRoute('app_vacation_show', ['id' => $employeeId]);
+    }// end delete()
 }// end class
