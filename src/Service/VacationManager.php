@@ -33,12 +33,15 @@ class VacationManager
     {
         $hireDate = $employee->getHireDate();
         $today = new \DateTime();
+
+        $limitDate = (clone $today)->modify('+6 months');
+
         $workYears = [];
 
         $yearStart = clone $hireDate;
         $yearCounter = 1;
 
-        while ($yearStart <= $today) {
+        while ($yearStart <= $limitDate) {
             $yearEnd = clone $yearStart;
             $yearEnd->modify('+1 year');
             $yearEnd->modify('-1 day');
@@ -80,7 +83,7 @@ class VacationManager
                 'seniority_days'  => $seniorityDays,
                 'fixed_days'      => $fixedDays,
                 'additional_days' => $seniorityDays + $fixedDays,
-                'total_days'      => $employee->getBaseVacationDays() + $seniorityDays + $fixedDays,
+                'total_days'      => $mainDays + $seniorityDays + $fixedDays,
             ];
 
             $yearStart->modify('+1 year');
