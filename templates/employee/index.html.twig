@@ -5,36 +5,33 @@
 {% block body %}
     <h1 class="mb-4">Сотрудники</h1>
 
-    <div class="row">
-        {% for employee in employees %}
-            <div class="col-md-4 mb-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ employee.fullName }}</h5>
-                        <p class="card-text">
-                            <small class="text-muted">
-                                Принят: {{ employee.hireDate|date('d.m.Y') }}
-                            </small>
-                        </p>
-                        <p class="card-text">
-                            Основной отпуск: {{ employee.baseVacationDays }} дней<br>
-                            Дополнительный: {{ employee.additionalVacationDays }} дней
-                        </p>
-                        <a href="{{ path('app_vacation_show', {'id': employee.id}) }}" class="btn btn-primary">
-                            Управлять отпусками
-                        </a>
-                        <a href="{{ path('app_employee_edit', {'id': employee.id}) }}" class="btn btn-outline-secondary">
-                            Редактировать
-                        </a>
-                    </div>
-                </div>
-            </div>
-        {% else %}
-            <div class="col-12">
-                <div class="alert alert-info">
-                    Сотрудники не найдены. <a href="{{ path('app_employee_new') }}">Добавить первого сотрудника</a>
-                </div>
-            </div>
-        {% endfor %}
-    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ФИО</th>
+                <th>Дата приема</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for employee in employees %}
+                <tr>
+                    <td>{{ employee.fullName }}</td>
+                    <td>{{ employee.hireDate|date('d.m.Y') }}</td>
+                    <td>
+                        <a href="{{ path('app_vacation_show', {'id': employee.id}) }}" class="btn btn-sm btn-primary">Управлять отпусками</a>
+                        <a href="{{ path('app_employee_edit', {'id': employee.id}) }}" class="btn btn-sm btn-outline-secondary">Редактировать</a>
+                        <form method="post" action="{{ path('app_employee_delete', {'id': employee.id}) }}" style="display: inline-block;" onsubmit="return confirm('Удалить сотрудника?');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ employee.id) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3">Сотрудники не найдены. <a href="{{ path('app_employee_new') }}">Добавить первого сотрудника</a></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 {% endblock %}

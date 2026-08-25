@@ -24,7 +24,7 @@ class EmployeeController extends AbstractController
         return $this->render(
             'employee/index.html.twig',
             [
-                'employees' => $employeeRepository->findAll(),
+                'employees' => $employeeRepository->findBy([], ['fullName' => 'ASC']),
             ]
         );
     }// end index()
