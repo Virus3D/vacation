@@ -68,6 +68,10 @@ class VacationManager
                 $mainDays = (int) ceil($employee->getBaseVacationDays() * $monthsWorked / 12);
                 $seniorityDays = (int) ceil($seniorityAdditionalDays * $monthsWorked / 12);
                 $fixedDays = (int) ceil($fixedAdditionalDays * $monthsWorked / 12);
+            } else if ($yearStart > $today && !$allowAdvance) {
+                $mainDays = 0;
+                $seniorityDays = 0;
+                $fixedDays = 0;
             } else {
                 // Для завершённых (прошлых) лет – полные дни.
                 $mainDays = $employee->getBaseVacationDays();
