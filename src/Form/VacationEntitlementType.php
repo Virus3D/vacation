@@ -35,6 +35,22 @@ class VacationEntitlementType extends AbstractType
                 ]
             )
             ->add(
+                'endDate',
+                DateType::class,
+                [
+                    'label'    => 'Действует до',
+                    'widget'   => 'single_text',
+                    'html5'    => false,
+                    'format'   => 'dd.MM.yyyy',
+                    'required' => false,
+                    'attr'     => [
+                        'class'        => 'form-control datepicker',
+                        'autocomplete' => 'off',
+                        'placeholder'  => 'не указано (бессрочно)',
+                    ],
+                ]
+            )
+            ->add(
                 'days',
                 IntegerType::class,
                 [

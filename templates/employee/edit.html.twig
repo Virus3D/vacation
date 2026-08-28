@@ -18,9 +18,11 @@
 
                 {# Скрытые прототипы полей #}
                 <div class="d-none">
-                    <div id="prototype-entitlement-startDate" 
+                    <div id="prototype-entitlement-startDate"
                          data-prototype="{{ form_widget(form.vacationEntitlements.vars.prototype.startDate)|e('html_attr') }}"></div>
-                    <div id="prototype-entitlement-days" 
+                    <div id="prototype-entitlement-endDate"
+                         data-prototype="{{ form_widget(form.vacationEntitlements.vars.prototype.endDate)|e('html_attr') }}"></div>
+                    <div id="prototype-entitlement-days"
                          data-prototype="{{ form_widget(form.vacationEntitlements.vars.prototype.days)|e('html_attr') }}"></div>
                 </div>
 
@@ -28,6 +30,7 @@
                     {% for entitlement in form.vacationEntitlements %}
                         <div class="entitlement-row mb-2 row align-items-end">
                             <div class="col">{{ form_widget(entitlement.startDate) }}</div>
+                            <div class="col">{{ form_widget(entitlement.endDate) }}</div>
                             <div class="col">{{ form_widget(entitlement.days) }}</div>
                             <div class="col-auto">
                                 <button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>
@@ -56,10 +59,12 @@
             addButton.addEventListener('click', function() {
                 // Получаем прототипы отдельных полей
                 const startDatePrototype = document.getElementById('prototype-entitlement-startDate').dataset.prototype;
+                const endDatePrototype = document.getElementById('prototype-entitlement-endDate').dataset.prototype;
                 const daysPrototype = document.getElementById('prototype-entitlement-days').dataset.prototype;
 
                 // Заменяем __name__ на текущий индекс
                 const startDateHtml = startDatePrototype.replace(/__name__/g, index);
+                const endDateHtml = endDatePrototype.replace(/__name__/g, index);
                 const daysHtml = daysPrototype.replace(/__name__/g, index);
 
                 // Создаём строку с колонками
@@ -72,15 +77,20 @@
 
                 const col2 = document.createElement('div');
                 col2.className = 'col';
-                col2.innerHTML = daysHtml;
+                col2.innerHTML = endDateHtml;
 
                 const col3 = document.createElement('div');
-                col3.className = 'col-auto';
-                col3.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>';
+                col3.className = 'col';
+                col3.innerHTML = daysHtml;
+
+                const col4 = document.createElement('div');
+                col4.className = 'col-auto';
+                col4.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-entitlement">Удалить</button>';
 
                 row.appendChild(col1);
                 row.appendChild(col2);
                 row.appendChild(col3);
+                row.appendChild(col4);
 
                 container.appendChild(row);
                 index++;

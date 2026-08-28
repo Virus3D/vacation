@@ -22,6 +22,9 @@ class VacationEntitlement
     #[ORM\Column(type: 'date')]
     private ?\DateTimeInterface $startDate = null;
 
+    #[ORM\Column(type: 'date', nullable: true)]
+    private ?\DateTimeInterface $endDate = null;
+
     #[ORM\Column(type: 'integer')]
     private ?int $days = null;
 
@@ -51,6 +54,17 @@ class VacationEntitlement
         $this->startDate = $startDate;
         return $this;
     }// end setStartDate()
+
+    public function getEndDate(): ?\DateTimeInterface
+    {
+        return $this->endDate;
+    }// end getEndDate()
+
+    public function setEndDate(?\DateTimeInterface $endDate): static
+    {
+        $this->endDate = $endDate;
+        return $this;
+    }// end setEndDate()
 
     public function getDays(): ?int
     {

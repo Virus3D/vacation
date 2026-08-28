@@ -126,6 +126,12 @@ class VacationManager
             $remaining['details'][] = [
                 'year_number'          => $year['year_number'],
                 'period'               => $year['start_date']->format('d.m.Y') . ' - ' . $year['end_date']->format('d.m.Y'),
+                'main_total'           => $year['main_days'],
+                'additional_total'     => $year['additional_days'],
+                'total_total'          => $year['main_days'] + $year['additional_days'],
+                'main_used'            => $usedDays['main'],
+                'additional_used'      => $usedDays['additional'],
+                'total_used'           => $usedDays['main'] + $usedDays['additional'],
                 'main_remaining'       => $mainRemaining,
                 'additional_remaining' => $additionalRemaining,
                 'total_remaining'      => $mainRemaining + $additionalRemaining,

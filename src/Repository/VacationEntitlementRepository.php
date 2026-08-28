@@ -20,16 +20,16 @@ class VacationEntitlementRepository extends ServiceEntityRepository
      */
     public function getDaysForEmployeeOnDate(int $employeeId, \DateTimeInterface $date): int
     {
-        $result = $this->createQueryBuilder('ve')
+        $qb = $this->createQueryBuilder('ve')
+            ->select('COALESCE(SUM(ve.days), 0) as totalDays')
             ->andWhere('ve.employee = :employeeId')
             ->andWhere('ve.startDate <= :date')
+            ->andWhere('ve.endDate IS NULL OR ve.endDate >= :date')
             ->setParameter('employeeId', $employeeId)
-            ->setParameter('date', $date->format('Y-m-d'))
-            ->orderBy('ve.startDate', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+            ->setParameter('date', $date->format('Y-m-d'));
 
-        return $result ? $result->getDays() : 0;
+        $result = $qb->getQuery()->getSingleScalarResult();
+
+        return (int) $result;
     }// end getDaysForEmployeeOnDate()
 }// end class
