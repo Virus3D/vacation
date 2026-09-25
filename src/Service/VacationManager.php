@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\Employee;
+use App\Entity\NonAccrualPeriod;
 use App\Entity\Vacation;
 use App\Entity\VacationDetail;
+use App\Repository\NonAccrualPeriodRepository;
 use App\Repository\VacationDetailRepository;
 use App\Repository\VacationEntitlementRepository;
 use App\Repository\VacationPlanRepository;
@@ -20,6 +22,7 @@ class VacationManager
         private VacationDetailRepository $vacationDetailRepository,
         private VacationEntitlementRepository $vacationEntitlementRepository,
         private VacationPlanRepository $vacationPlanRepository,
+        private NonAccrualPeriodRepository $nonAccrualPeriodRepository,
         private HolidayCalendar $holidayCalendar
     ) {
     }// end __construct()
@@ -36,15 +39,15 @@ class VacationManager
 
         $limitDate = (clone $today)->modify('+6 months');
 
+        $excludedPeriods = $this->nonAccrualPeriodRepository->findByEmployee($employee->getId());
+
         $workYears = [];
 
         $yearStart = clone $hireDate;
         $yearCounter = 1;
 
         while ($yearStart <= $limitDate) {
-            $yearEnd = clone $yearStart;
-            $yearEnd->modify('+1 year');
-            $yearEnd->modify('-1 day');
+            $yearEnd = $this->calculateYearEnd($yearStart, $excludedPeriods);
 
             // Рассчитываем дополнительные дни (1 день за каждый год, максимум 10).
             $seniorityAdditionalDays = min(
@@ -53,21 +56,28 @@ class VacationManager
             );
 
             // Фиксированные дополнительные дни, действующие на начало рабочего года.
+            $dateForFixed = ($yearEnd >= $today) ? $today : $yearStart;
             $fixedAdditionalDays = $this->vacationEntitlementRepository->getDaysForEmployeeOnDate(
                 $employee->getId(),
-                $yearStart
+                $dateForFixed
             );
 
             // Если год ещё не завершён (текущий рабочий год).
             if ($yearEnd >= $today && $yearStart <= $today && !$allowAdvance) {
-                // Количество полных отработанных месяцев.
-                $interval = $yearStart->diff($today);
-                $monthsWorked = ($interval->y * 12) + $interval->m;
+                // Текущий (незавершённый) год: пропорционально фактически отработанным дням.
+                $totalDays = $yearStart->diff($yearEnd)->days + 1;
+                $excludedInYear = $this->countExcludedDaysInRange($yearStart, $yearEnd, $excludedPeriods);
+                $accruableTotal = $totalDays - $excludedInYear;
 
-                // Пропорциональный расчёт дней.
-                $mainDays = (int) ceil($employee->getBaseVacationDays() * $monthsWorked / 12);
-                $seniorityDays = (int) ceil($seniorityAdditionalDays * $monthsWorked / 12);
-                $fixedDays = (int) ceil($fixedAdditionalDays * $monthsWorked / 12);
+                $elapsedDays = $yearStart->diff($today)->days + 1;
+                $excludedElapsed = $this->countExcludedDaysInRange($yearStart, $today, $excludedPeriods);
+                $accruableWorked = $elapsedDays - $excludedElapsed;
+
+                $ratio = $accruableTotal > 0 ? min(1, $accruableWorked / $accruableTotal) : 0;
+
+                $mainDays = (int) floor($employee->getBaseVacationDays() * $ratio);
+                $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
+                $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
             } else if ($yearStart > $today && !$allowAdvance) {
                 $mainDays = 0;
                 $seniorityDays = 0;
@@ -77,7 +87,7 @@ class VacationManager
                 $mainDays = $employee->getBaseVacationDays();
                 $seniorityDays = $seniorityAdditionalDays;
                 $fixedDays = $fixedAdditionalDays;
-            }
+            }// end if
 
             $workYears[] = [
                 'year_number'     => $yearCounter,
@@ -90,12 +100,83 @@ class VacationManager
                 'total_days'      => $mainDays + $seniorityDays + $fixedDays,
             ];
 
-            $yearStart->modify('+1 year');
+            $yearStart = (clone $yearEnd)->modify('+1 day');
             $yearCounter++;
         }// end while
 
         return $workYears;
     }// end getWorkYears()
+
+    /**
+     * Рассчитывает окончание рабочего года с учётом исключаемых периодов.
+     *
+     * @param array<int, NonAccrualPeriod> $excludedPeriods
+     */
+    private function calculateYearEnd(DateTimeInterface $yearStart, array $excludedPeriods): DateTimeInterface
+    {
+        $yearEnd = (clone $yearStart)->modify('+1 year')->modify('-1 day');
+
+        // Итеративно сдвигаем конец года на количество исключённых дней.
+        for ($i = 0; $i < 10; $i++) {
+            $excludedDays = 0;
+            foreach ($excludedPeriods as $period) {
+                $excludedDays += $this->countOverlapDays(
+                    $yearStart,
+                    $yearEnd,
+                    $period->getStartDate(),
+                    $period->getEndDate()
+                );
+            }
+
+            if ($excludedDays === 0) {
+                break;
+            }
+
+            $newEnd = (clone $yearEnd)->modify('+' . $excludedDays . ' days');
+            if ($newEnd == $yearEnd) {
+                break;
+            }
+            $yearEnd = $newEnd;
+        }// end for
+
+        return $yearEnd;
+    }// end calculateYearEnd()
+
+    /**
+     * Количество дней пересечения двух диапазонов (включительно).
+     */
+    private function countOverlapDays(
+        DateTimeInterface $aStart,
+        DateTimeInterface $aEnd,
+        DateTimeInterface $bStart,
+        DateTimeInterface $bEnd
+    ): int {
+        $start = max($aStart, $bStart);
+        $end = min($aEnd, $bEnd);
+
+        if ($start > $end) {
+            return 0;
+        }
+
+        return $start->diff($end)->days + 1;
+    }// end countOverlapDays()
+
+    /**
+     * Количество исключённых дней в диапазоне [from, to].
+     *
+     * @param array<int, NonAccrualPeriod> $excludedPeriods
+     */
+    private function countExcludedDaysInRange(
+        DateTimeInterface $from,
+        DateTimeInterface $to,
+        array $excludedPeriods
+    ): int {
+        $days = 0;
+        foreach ($excludedPeriods as $period) {
+            $days += $this->countOverlapDays($from, $to, $period->getStartDate(), $period->getEndDate());
+        }
+        return $days;
+    }// end countExcludedDaysInRange()
 
     /**
      * Получить остаток дней на текущий момент.

@@ -37,6 +37,28 @@
                 </div>
                 <button type="button" class="btn btn-secondary btn-sm add-entitlement">Добавить период</button>
 
+                <h4>Периоды без начисления отпуска (декрет, отпуск по уходу за ребенком и т.п.)</h4>
+
+                <div class="d-none">
+                    <div id="prototype-nap-startDate" data-prototype="{{ form_widget(form.nonAccrualPeriods.vars.prototype.startDate)|e('html_attr') }}"></div>
+                    <div id="prototype-nap-endDate" data-prototype="{{ form_widget(form.nonAccrualPeriods.vars.prototype.endDate)|e('html_attr') }}"></div>
+                    <div id="prototype-nap-type" data-prototype="{{ form_widget(form.nonAccrualPeriods.vars.prototype.type)|e('html_attr') }}"></div>
+                    <div id="prototype-nap-comment" data-prototype="{{ form_widget(form.nonAccrualPeriods.vars.prototype.comment)|e('html_attr') }}"></div>
+                </div>
+
+                <div id="non-accrual-periods">
+                    {% for period in form.nonAccrualPeriods %}
+                        <div class="nap-row mb-2 row align-items-end">
+                            <div class="col">{{ form_widget(period.startDate) }}</div>
+                            <div class="col">{{ form_widget(period.endDate) }}</div>
+                            <div class="col">{{ form_widget(period.type) }}</div>
+                            <div class="col">{{ form_widget(period.comment) }}</div>
+                            <div class="col-auto"><button type="button" class="btn btn-danger btn-sm remove-nap">Удалить</button></div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm add-nap">Добавить период</button>
+
                 <div class="mt-3">
                     <button type="submit" class="btn btn-primary">Сохранить</button>
                     <a href="{{ path('app_employee_index') }}" class="btn btn-outline-secondary">Отмена</a>
@@ -93,6 +115,40 @@
             container.addEventListener('click', function(e) {
                 if (e.target.classList.contains('remove-entitlement')) {
                     e.target.closest('.entitlement-row').remove();
+                }
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('non-accrual-periods');
+            const addButton = document.querySelector('.add-nap');
+            if (!container || !addButton) return;
+
+            let index = container.children.length;
+
+            addButton.addEventListener('click', function() {
+                const p1 = document.getElementById('prototype-nap-startDate').dataset.prototype;
+                const p2 = document.getElementById('prototype-nap-endDate').dataset.prototype;
+                const p3 = document.getElementById('prototype-nap-type').dataset.prototype;
+                const p4 = document.getElementById('prototype-nap-comment').dataset.prototype;
+
+                const row = document.createElement('div');
+                row.className = 'nap-row mb-2 row align-items-end';
+                row.innerHTML = `
+                    <div class="col">${p1.replace(/__name__/g, index)}</div>
+                    <div class="col">${p2.replace(/__name__/g, index)}</div>
+                    <div class="col">${p3.replace(/__name__/g, index)}</div>
+                    <div class="col">${p4.replace(/__name__/g, index)}</div>
+                    <div class="col-auto"><button type="button" class="btn btn-danger btn-sm remove-nap">Удалить</button></div>
+                `;
+                container.appendChild(row);
+                index++;
+                flatpickr('.datepicker', { dateFormat: 'd.m.Y', allowInput: true, locale: 'ru' });
+            });
+
+            container.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-nap')) {
+                    e.target.closest('.nap-row').remove();
                 }
             });
         });

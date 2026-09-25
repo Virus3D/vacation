@@ -88,6 +88,18 @@ class EmployeeType extends AbstractType
                     'label'         => 'Фиксированные дополнительные дни',
                     'entry_options' => ['label' => false],
                 ]
+            )
+            ->add(
+                'nonAccrualPeriods',
+                CollectionType::class,
+                [
+                    'entry_type'    => NonAccrualPeriodType::class,
+                    'allow_add'     => true,
+                    'allow_delete'  => true,
+                    'by_reference'  => false,
+                    'label'         => 'Периоды без начисления отпуска',
+                    'entry_options' => ['label' => false],
+                ]
             );
         ;
     }// end buildForm()

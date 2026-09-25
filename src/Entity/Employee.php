@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\EmployeeRepository;
+use DateTimeInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -21,7 +22,7 @@ class Employee
     private ?string $fullName = null;
 
     #[ORM\Column(type: 'date')]
-    private ?\DateTimeInterface $hireDate = null;
+    private ?DateTimeInterface $hireDate = null;
 
     #[ORM\Column(type: 'integer')]
     private ?int $baseVacationDays = 28;
@@ -34,6 +35,17 @@ class Employee
 
     #[ORM\OneToMany(mappedBy: 'employee', targetEntity: Vacation::class, cascade: ['persist', 'remove'])]
     private Collection $vacations;
+
+    #[ORM\OneToMany(
+        mappedBy: 'employee',
+        targetEntity: NonAccrualPeriod::class,
+        cascade: [
+            'persist',
+            'remove',
+        ],
+        orphanRemoval: true
+    )]
+    private Collection $nonAccrualPeriods;
 
     #[ORM\OneToMany(
         mappedBy: 'employee',
@@ -50,6 +62,7 @@ class Employee
     {
         $this->vacations = new ArrayCollection();
         $this->vacationEntitlements = new ArrayCollection();
+        $this->nonAccrualPeriods = new ArrayCollection();
     }// end __construct()
 
     public function getId(): ?int
@@ -68,12 +81,12 @@ class Employee
         return $this;
     }// end setFullName()
 
-    public function getHireDate(): ?\DateTimeInterface
+    public function getHireDate(): ?DateTimeInterface
     {
         return $this->hireDate;
     }// end getHireDate()
 
-    public function setHireDate(\DateTimeInterface $hireDate): static
+    public function setHireDate(DateTimeInterface $hireDate): static
     {
         $this->hireDate = $hireDate;
         return $this;
@@ -181,7 +194,7 @@ class Employee
     /**
      * Возвращает фиксированные дополнительные дни отпуска на указанную дату.
      */
-    public function getFixedAdditionalDaysForDate(\DateTimeInterface $date): int
+    public function getFixedAdditionalDaysForDate(DateTimeInterface $date): int
     {
         $days = 0;
         foreach ($this->vacationEntitlements as $entitlement) {
@@ -195,4 +208,37 @@ class Employee
         // Альтернативно: отсортировать коллекцию по startDate и взять последнюю <= date.
         return $days;
     }// end getFixedAdditionalDaysForDate()
+
+    /**
+     * @return Collection<int, NonAccrualPeriod>
+     */
+    public function getNonAccrualPeriods(): Collection
+    {
+        return $this->nonAccrualPeriods;
+    }// end getNonAccrualPeriods()
+
+    /**
+     * Добавляет период непредоставления отпуска.
+     */
+    public function addNonAccrualPeriod(NonAccrualPeriod $p): static
+    {
+        if (!$this->nonAccrualPeriods->contains($p)) {
+            $this->nonAccrualPeriods->add($p);
+            $p->setEmployee($this);
+        }
+        return $this;
+    }// end addNonAccrualPeriod()
+
+    /**
+     * Удаляет период непредоставления отпуска.
+     */
+    public function removeNonAccrualPeriod(NonAccrualPeriod $p): static
+    {
+        if ($this->nonAccrualPeriods->removeElement($p)) {
+            if ($p->getEmployee() === $this) {
+                $p->setEmployee(null);
+            }
+        }
+        return $this;
+    }// end removeNonAccrualPeriod()
 }// end class
