@@ -47,7 +47,17 @@ class VacationManager
         $yearCounter = 1;
 
         while ($yearStart <= $limitDate) {
-            $yearEnd = $this->calculateYearEnd($yearStart, $excludedPeriods);
+            // Границы года остаются как раньше: +1 год −1 день.
+            $yearEnd = (clone $yearStart)->modify('+1 year')->modify('-1 day');
+
+            // Всего календарных дней в году.
+            $totalDaysInYear = $yearStart->diff($yearEnd)->days + 1;
+
+            // Дни без начисления, попавшие в этот рабочий год.
+            $excludedInYear = $this->countExcludedDaysInRange($yearStart, $yearEnd, $excludedPeriods);
+
+            // Отработано в году (без исключений).
+            $workedDaysFullYear = max(0, $totalDaysInYear - $excludedInYear);
 
             // Рассчитываем дополнительные дни (1 день за каждый год, максимум 10).
             $seniorityAdditionalDays = min(
@@ -56,26 +66,22 @@ class VacationManager
             );
 
             // Фиксированные дополнительные дни, действующие на начало рабочего года.
-            $dateForFixed = ($yearEnd >= $today) ? $today : $yearStart;
             $fixedAdditionalDays = $this->vacationEntitlementRepository->getDaysForEmployeeOnDate(
                 $employee->getId(),
-                $dateForFixed
+                $yearStart
             );
 
             // Если год ещё не завершён (текущий рабочий год).
             if ($yearEnd >= $today && $yearStart <= $today && !$allowAdvance) {
-                // Текущий (незавершённый) год: пропорционально фактически отработанным дням.
-                $totalDays = $yearStart->diff($yearEnd)->days + 1;
-                $excludedInYear = $this->countExcludedDaysInRange($yearStart, $yearEnd, $excludedPeriods);
-                $accruableTotal = $totalDays - $excludedInYear;
+                // Отработано до сегодня (без исключений).
+                $workedDaysToDate = $today->diff($yearStart)->days + 1;
+                $excludedToDate   = $this->countExcludedDaysInRange($yearStart, $today, $excludedPeriods);
+                $workedToDate     = max(0, $workedDaysToDate - $excludedToDate);
 
-                $elapsedDays = $yearStart->diff($today)->days + 1;
-                $excludedElapsed = $this->countExcludedDaysInRange($yearStart, $today, $excludedPeriods);
-                $accruableWorked = $elapsedDays - $excludedElapsed;
+                $ratio = $totalDaysInYear > 0 ? min(1, $workedToDate / $totalDaysInYear) : 0;
 
-                $ratio = $accruableTotal > 0 ? min(1, $accruableWorked / $accruableTotal) : 0;
-
-                $mainDays = (int) floor($employee->getBaseVacationDays() * $ratio);
+                // Пропорциональный расчёт дней.
+                $mainDays = (int) ceil($employee->getBaseVacationDays() * $ratio);
                 $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
                 $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
             } else if ($yearStart > $today && !$allowAdvance) {
@@ -84,9 +90,10 @@ class VacationManager
                 $fixedDays = 0;
             } else {
                 // Для завершённых (прошлых) лет – полные дни.
-                $mainDays = $employee->getBaseVacationDays();
-                $seniorityDays = $seniorityAdditionalDays;
-                $fixedDays = $fixedAdditionalDays;
+                $ratio = $totalDaysInYear > 0 ? $workedDaysFullYear / $totalDaysInYear : 0;
+                $mainDays = (int) ceil($employee->getBaseVacationDays() * $ratio);
+                $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
+                $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
             }// end if
 
             $workYears[] = [
