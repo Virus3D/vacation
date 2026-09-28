@@ -45,6 +45,22 @@ class EmployeeType extends AbstractType
                 ]
             )
             ->add(
+                'terminationDate',
+                DateType::class,
+                [
+                    'label'    => 'Дата увольнения (если применимо)',
+                    'widget'   => 'single_text',
+                    'html5'    => false,
+                    'format'   => 'dd.MM.yyyy',
+                    'required' => false,
+                    'attr'     => [
+                        'class'        => 'form-control datepicker',
+                        'autocomplete' => 'off',
+                        'placeholder'  => 'не уволен',
+                    ],
+                ]
+            )
+            ->add(
                 'baseVacationDays',
                 IntegerType::class,
                 [

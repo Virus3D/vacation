@@ -5,12 +5,24 @@
 {% block body %}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="mb-0">{{ employee.fullName }}</h1>
-            <p class="text-muted mb-0">Дата трудоустройства: {{ employee.hireDate|date('d.m.Y') }}</p>
+            <h1 class="mb-0">
+                {{ employee.fullName }}
+                {% if employee.isTerminated %}
+                    <span class="badge bg-secondary">Уволен</span>
+                {% endif %}
+            </h1>
+            <p class="text-muted mb-0">
+                Дата трудоустройства: {{ employee.hireDate|date('d.m.Y') }}
+                {% if employee.terminationDate %}
+                    | Дата увольнения: {{ employee.terminationDate|date('d.m.Y') }}
+                {% endif %}
+            </p>
         </div>
+        {% if not employee.isTerminated %}
         <a href="{{ path('app_vacation_plan_new', {'employee': employee.id}) }}" class="btn btn-outline-primary">
             Запланировать отпуск
         </a>
+        {% endif %}
     </div>
 
     <div class="row mb-4">

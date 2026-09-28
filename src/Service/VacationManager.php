@@ -35,9 +35,18 @@ class VacationManager
     public function getWorkYears(Employee $employee, bool $allowAdvance = false): array
     {
         $hireDate = $employee->getHireDate();
-        $today = new \DateTime();
 
-        $limitDate = (clone $today)->modify('+6 months');
+        // Дата отсчёта для расчёта начислений:
+        // - если сотрудник уволен, используем дату увольнения;
+        // - иначе – сегодня.
+        $cutoffDate = $employee->isTerminated() ? $employee->getTerminationDate() : new \DateTime();
+
+        // Верхняя граница для отображения будущих периодов.
+        if (!$employee->isTerminated()) {
+            $limitDate = (clone $cutoffDate)->modify('+6 months');
+        } else {
+            $limitDate = $cutoffDate;
+        }
 
         $excludedPeriods = $this->nonAccrualPeriodRepository->findByEmployee($employee->getId());
 
@@ -72,10 +81,10 @@ class VacationManager
             );
 
             // Если год ещё не завершён (текущий рабочий год).
-            if ($yearEnd >= $today && $yearStart <= $today && !$allowAdvance) {
+            if ($yearEnd >= $cutoffDate && $yearStart <= $cutoffDate && !$allowAdvance) {
                 // Отработано до сегодня (без исключений).
-                $workedDaysToDate = $today->diff($yearStart)->days + 1;
-                $excludedToDate   = $this->countExcludedDaysInRange($yearStart, $today, $excludedPeriods);
+                $workedDaysToDate = $cutoffDate->diff($yearStart)->days + 1;
+                $excludedToDate   = $this->countExcludedDaysInRange($yearStart, $cutoffDate, $excludedPeriods);
                 $workedToDate     = max(0, $workedDaysToDate - $excludedToDate);
 
                 $ratio = $totalDaysInYear > 0 ? min(1, $workedToDate / $totalDaysInYear) : 0;
@@ -84,7 +93,7 @@ class VacationManager
                 $mainDays = (int) ceil($employee->getBaseVacationDays() * $ratio);
                 $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
                 $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
-            } else if ($yearStart > $today && !$allowAdvance) {
+            } else if ($yearStart > $cutoffDate && !$allowAdvance) {
                 $mainDays = 0;
                 $seniorityDays = 0;
                 $fixedDays = 0;
@@ -504,10 +513,18 @@ class VacationManager
     {
         $hireDate = $employee->getHireDate();
         $target = clone $date;
-        $today = new \DateTime();
 
         // Если дата раньше даты приёма – нет накоплений.
         if ($target < $hireDate) {
+            return [
+                'main'       => 0,
+                'additional' => 0,
+                'total'      => 0,
+            ];
+        }
+
+        // Если целевая дата после увольнения — начислений нет.
+        if ($employee->isTerminated() && $date > $employee->getTerminationDate()) {
             return [
                 'main'       => 0,
                 'additional' => 0,

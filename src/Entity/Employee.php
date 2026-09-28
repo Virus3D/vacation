@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\EmployeeRepository;
+use DateTime;
 use DateTimeInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -23,6 +24,9 @@ class Employee
 
     #[ORM\Column(type: 'date')]
     private ?DateTimeInterface $hireDate = null;
+
+    #[ORM\Column(type: 'date', nullable: true)]
+    private ?DateTimeInterface $terminationDate = null;
 
     #[ORM\Column(type: 'integer')]
     private ?int $baseVacationDays = 28;
@@ -91,6 +95,34 @@ class Employee
         $this->hireDate = $hireDate;
         return $this;
     }// end setHireDate()
+
+    public function getTerminationDate(): ?DateTimeInterface
+    {
+        return $this->terminationDate;
+    }// end getTerminationDate()
+
+    public function setTerminationDate(?DateTimeInterface $terminationDate): static
+    {
+        $this->terminationDate = $terminationDate;
+        return $this;
+    }// end setTerminationDate()
+
+    public function getEffectiveDate(): DateTimeInterface
+    {
+        $today = new DateTime();
+        if ($this->terminationDate !== null) {
+            return $this->terminationDate;
+        }
+        return $today;
+    }// end getEffectiveDate()
+
+    /**
+     * Проверка: уволен ли сотрудник.
+     */
+    public function isTerminated(): bool
+    {
+        return $this->terminationDate !== null;
+    }// end isTerminated()
 
     public function getBaseVacationDays(): ?int
     {
