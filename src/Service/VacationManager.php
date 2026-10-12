@@ -45,6 +45,8 @@ class VacationManager
 
         $yearsList = $this->getWorkYearList($employee, new DateTime());
 
+        $usedDaysMap = $this->vacationDetailRepository->getUsedDaysByYearBatch($yearsList);
+
         $yearCounter = 1;
         foreach ($yearsList as $usedPeriod) {
             $entKey = $employee->getId() . '|' . $usedPeriod['yearStart']->format('Y-m-d');
