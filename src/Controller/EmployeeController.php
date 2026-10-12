@@ -7,6 +7,8 @@ namespace App\Controller;
 use App\Entity\Employee;
 use App\Form\EmployeeType;
 use App\Repository\EmployeeRepository;
+use App\Service\VacationManager;
+use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -15,16 +17,26 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class EmployeeController extends AbstractController
 {
+    public function __construct(
+        private VacationManager $vacationManager
+    ) {
+    }// end __construct()
+
     /**
      * Главная страница.
      */
     #[Route('/', name: 'app_employee_index', methods: ['GET'])]
     public function index(EmployeeRepository $employeeRepository): Response
     {
+        $employees = $employeeRepository->findBy([], ['fullName' => 'ASC']);
+
+        $remainingDays = $this->vacationManager->getRemainingDaysBatch($employees, new DateTime());
+
         return $this->render(
             'employee/index.html.twig',
             [
-                'employees' => $employeeRepository->findBy([], ['fullName' => 'ASC']),
+                'employees'     => $employees,
+                'remainingDays' => $remainingDays,
             ]
         );
     }// end index()

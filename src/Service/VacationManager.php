@@ -12,11 +12,17 @@ use App\Repository\NonAccrualPeriodRepository;
 use App\Repository\VacationDetailRepository;
 use App\Repository\VacationEntitlementRepository;
 use App\Repository\VacationPlanRepository;
+use DateTime;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 
 class VacationManager
 {
+    /**
+     * @var array<string, array<array<mixed>>> Кэш рабочих годов: employeeId|allowAdvance => workYears
+     */
+    private array $workYearsCache = [];
+
     public function __construct(
         private EntityManagerInterface $entityManager,
         private VacationDetailRepository $vacationDetailRepository,
@@ -28,27 +34,73 @@ class VacationManager
     }// end __construct()
 
     /**
-     * Получить рабочие годы сотрудника
+     * Получить рабочие годы.
      *
      * @return array<array<mixed>>
      */
     public function getWorkYears(Employee $employee, bool $allowAdvance = false): array
     {
+        $allNonAccrualPeriods = $this->nonAccrualPeriodRepository->findByEmployees([$employee->getId()]);
+        $excludedPeriods = $allNonAccrualPeriods[$employee->getId()] ?? [];
+
+        $yearsList = $this->getWorkYearList($employee, new DateTime());
+
+        $yearCounter = 1;
+        foreach ($yearsList as $usedPeriod) {
+            $entKey = $employee->getId() . '|' . $usedPeriod['yearStart']->format('Y-m-d');
+            $fixedAdditionalDays = $entitlementsMap[$entKey] ?? 0;
+            $days = $this->getWorkYearDays(
+                $employee,
+                $yearCounter,
+                $usedPeriod['cutoffDate'],
+                $usedPeriod['yearStart'],
+                $usedPeriod['yearEnd'],
+                $excludedPeriods,
+                $fixedAdditionalDays,
+                $allowAdvance
+            );
+
+            // Используемые дни.
+            $usedKey = $employee->getId() . '|' . $usedPeriod['yearStart']->format('Y-m-d') . '|' . $usedPeriod['yearEnd']->format('Y-m-d');
+            $usedDays = $usedDaysMap[$usedKey] ?? [
+                'main'       => 0,
+                'additional' => 0,
+            ];
+
+            $days['used'] = $usedDays;
+            $days['remaining'] = [
+                'main'       => max(0, $days['main_days'] - $usedDays['main']),
+                'additional' => max(0, $days['additional_days'] - $usedDays['additional']),
+            ];
+            $days['used']['total'] = $days['used']['main'] + $days['used']['additional'];
+
+            $days['remaining']['total'] = $days['remaining']['main'] + $days['remaining']['additional'];
+
+            $workYears[] = $days;
+            $yearCounter++;
+        }// end foreach
+
+        return $workYears;
+    }// end getWorkYears()
+
+    /**
+     * Получить рабочие годы сотрудника (вынесенная логика).
+     *
+     * @return array<array<mixed>>
+     */
+    private function getWorkYearList(
+        Employee $employee,
+        DateTimeInterface $currentDate,
+    ): array {
+        $id = $employee->getId();
+
         $hireDate = $employee->getHireDate();
 
-        // Дата отсчёта для расчёта начислений:
-        // - если сотрудник уволен, используем дату увольнения;
-        // - иначе – сегодня.
-        $cutoffDate = $employee->isTerminated() ? $employee->getTerminationDate() : new \DateTime();
+        $cutoffDate = $employee->isTerminated()
+            ? ($employee->getTerminationDate() ?? $currentDate)
+            : $currentDate;
 
-        // Верхняя граница для отображения будущих периодов.
-        if (!$employee->isTerminated()) {
-            $limitDate = (clone $cutoffDate)->modify('+6 months');
-        } else {
-            $limitDate = $cutoffDate;
-        }
-
-        $excludedPeriods = $this->nonAccrualPeriodRepository->findByEmployee($employee->getId());
+        $limitDate = $employee->isTerminated() ? $cutoffDate : (clone $cutoffDate)->modify('+6 months');
 
         $workYears = [];
 
@@ -56,64 +108,14 @@ class VacationManager
         $yearCounter = 1;
 
         while ($yearStart <= $limitDate) {
-            // Границы года остаются как раньше: +1 год −1 день.
+            // Границы года: +1 год −1 день.
             $yearEnd = (clone $yearStart)->modify('+1 year')->modify('-1 day');
 
-            // Всего календарных дней в году.
-            $totalDaysInYear = $yearStart->diff($yearEnd)->days + 1;
-
-            // Дни без начисления, попавшие в этот рабочий год.
-            $excludedInYear = $this->countExcludedDaysInRange($yearStart, $yearEnd, $excludedPeriods);
-
-            // Отработано в году (без исключений).
-            $workedDaysFullYear = max(0, $totalDaysInYear - $excludedInYear);
-
-            // Рассчитываем дополнительные дни (1 день за каждый год, максимум 10).
-            $seniorityAdditionalDays = min(
-                $employee->getAdditionalVacationDays() + $yearCounter - 1,
-                $employee->getMaxSeniorityAdditionalDays() ?? 10
-            );
-
-            // Фиксированные дополнительные дни, действующие на начало рабочего года.
-            $fixedAdditionalDays = $this->vacationEntitlementRepository->getDaysForEmployeeOnDate(
-                $employee->getId(),
-                $yearStart
-            );
-
-            // Если год ещё не завершён (текущий рабочий год).
-            if ($yearEnd >= $cutoffDate && $yearStart <= $cutoffDate && !$allowAdvance) {
-                // Отработано до сегодня (без исключений).
-                $workedDaysToDate = $cutoffDate->diff($yearStart)->days + 1;
-                $excludedToDate   = $this->countExcludedDaysInRange($yearStart, $cutoffDate, $excludedPeriods);
-                $workedToDate     = max(0, $workedDaysToDate - $excludedToDate);
-
-                $ratio = $totalDaysInYear > 0 ? min(1, $workedToDate / $totalDaysInYear) : 0;
-
-                // Пропорциональный расчёт дней.
-                $mainDays = (int) ceil($employee->getBaseVacationDays() * $ratio);
-                $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
-                $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
-            } else if ($yearStart > $cutoffDate && !$allowAdvance) {
-                $mainDays = 0;
-                $seniorityDays = 0;
-                $fixedDays = 0;
-            } else {
-                // Для завершённых (прошлых) лет – полные дни.
-                $ratio = $totalDaysInYear > 0 ? $workedDaysFullYear / $totalDaysInYear : 0;
-                $mainDays = (int) ceil($employee->getBaseVacationDays() * $ratio);
-                $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
-                $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
-            }// end if
-
             $workYears[] = [
-                'year_number'     => $yearCounter,
-                'start_date'      => clone $yearStart,
-                'end_date'        => clone $yearEnd,
-                'main_days'       => $mainDays,
-                'seniority_days'  => $seniorityDays,
-                'fixed_days'      => $fixedDays,
-                'additional_days' => $seniorityDays + $fixedDays,
-                'total_days'      => $mainDays + $seniorityDays + $fixedDays,
+                'employeeId' => $id,
+                'yearStart'  => $yearStart,
+                'yearEnd'    => $yearEnd,
+                'cutoffDate' => $cutoffDate,
             ];
 
             $yearStart = (clone $yearEnd)->modify('+1 day');
@@ -121,42 +123,75 @@ class VacationManager
         }// end while
 
         return $workYears;
-    }// end getWorkYears()
+    }// end getWorkYearList()
 
     /**
-     * Рассчитывает окончание рабочего года с учётом исключаемых периодов.
+     * @param NonAccrualPeriod[] $excludedPeriods
      *
-     * @param array<int, NonAccrualPeriod> $excludedPeriods
+     * @return array<string, mixed>
      */
-    private function calculateYearEnd(DateTimeInterface $yearStart, array $excludedPeriods): DateTimeInterface
-    {
-        $yearEnd = (clone $yearStart)->modify('+1 year')->modify('-1 day');
+    private function getWorkYearDays(
+        Employee $employee,
+        int $yearCounter,
+        DateTimeInterface $cutoffDate,
+        DateTimeInterface $yearStart,
+        DateTimeInterface $yearEnd,
+        array $excludedPeriods,
+        int $fixedAdditionalDays,
+        bool $allowAdvance,
+    ): array {
+        // Всего календарных дней в году.
+        $totalDaysInYear = $yearStart->diff($yearEnd)->days + 1;
 
-        // Итеративно сдвигаем конец года на количество исключённых дней.
-        for ($i = 0; $i < 10; $i++) {
-            $excludedDays = 0;
-            foreach ($excludedPeriods as $period) {
-                $excludedDays += $this->countOverlapDays(
-                    $yearStart,
-                    $yearEnd,
-                    $period->getStartDate(),
-                    $period->getEndDate()
-                );
-            }
+        // Дни без начисления, попавшие в этот рабочий год.
+        $excludedInYear = $this->countExcludedDaysInRange($yearStart, $yearEnd, $excludedPeriods);
 
-            if ($excludedDays === 0) {
-                break;
-            }
+        // Отработано в году (без исключений).
+        $workedDaysFullYear = max(0, $totalDaysInYear - $excludedInYear);
 
-            $newEnd = (clone $yearEnd)->modify('+' . $excludedDays . ' days');
-            if ($newEnd == $yearEnd) {
-                break;
-            }
-            $yearEnd = $newEnd;
-        }// end for
+        // Рассчитываем дополнительные дни (1 день за каждый год, максимум 10).
+        $seniorityAdditionalDays = min(
+            $employee->getAdditionalVacationDays() + $yearCounter - 1,
+            $employee->getMaxSeniorityAdditionalDays() ?? 10
+        );
 
-        return $yearEnd;
-    }// end calculateYearEnd()
+        // Если год ещё не завершён (текущий рабочий год).
+        if ($yearEnd >= $cutoffDate && $yearStart <= $cutoffDate && !$allowAdvance) {
+            // Отработано до сегодня (без исключений).
+            $workedDaysToDate = $cutoffDate->diff($yearStart)->days + 1;
+            $excludedToDate   = $this->countExcludedDaysInRange($yearStart, $cutoffDate, $excludedPeriods);
+            $workedToDate     = max(0, $workedDaysToDate - $excludedToDate);
+
+            $ratio = $totalDaysInYear > 0 ? min(1, $workedToDate / $totalDaysInYear) : 0;
+
+            // Пропорциональный расчёт дней.
+            $mainDays = (int) ceil($employee->getBaseVacationDays() * $ratio);
+            $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
+            $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
+        } else if ($yearStart > $cutoffDate && !$allowAdvance) {
+            $mainDays = 0;
+            $seniorityDays = 0;
+            $fixedDays = 0;
+        } else {
+            // Для завершённых (прошлых) лет – полные дни.
+            $ratio = $totalDaysInYear > 0 ? $workedDaysFullYear / $totalDaysInYear : 0;
+            $mainDays = (int) ceil($employee->getBaseVacationDays() * $ratio);
+            $seniorityDays = (int) ceil($seniorityAdditionalDays * $ratio);
+            $fixedDays = (int) ceil($fixedAdditionalDays * $ratio);
+        }// end if
+
+        return [
+            'year_number'     => $yearCounter,
+            'cutoffDate'      => $cutoffDate,
+            'start_date'      => clone $yearStart,
+            'end_date'        => clone $yearEnd,
+            'main_days'       => $mainDays,
+            'seniority_days'  => $seniorityDays,
+            'fixed_days'      => $fixedDays,
+            'additional_days' => $seniorityDays + $fixedDays,
+            'total_days'      => $mainDays + $seniorityDays + $fixedDays,
+        ];
+    }// end getWorkYearDays()
 
     /**
      * Количество дней пересечения двух диапазонов (включительно).
@@ -195,55 +230,101 @@ class VacationManager
     }// end countExcludedDaysInRange()
 
     /**
-     * Получить остаток дней на текущий момент.
+     * Пакетно получить остатки дней для нескольких сотрудников за 3 запроса к БД.
      *
-     * @return array<string, mixed>
+     * @param Employee[] $employees
+     *
+     * @return array<int, array<string, mixed>>  ключ => employeeId, значение => ['main', 'additional', 'total']
      */
-    public function getRemainingDays(Employee $employee): array
+    public function getRemainingDaysBatch(array $employees, ?DateTimeInterface $currentDate): array
     {
-        $workYears = $this->getWorkYears($employee);
-        $today = new \DateTime();
+        if ($employees === []) {
+            return [];
+        }
 
-        $remaining = [
-            'main'       => 0,
-            'additional' => 0,
-            'total'      => 0,
-            'details'    => [],
-        ];
+        if ($currentDate === null) {
+            $currentDate = new Datetime();
+        }
 
-        foreach ($workYears as $year) {
-            $usedDays = $this->vacationDetailRepository->getUsedDaysByYear(
-                $employee->getId(),
-                $year['start_date'],
-                $year['end_date']
-            );
-            $mainRemaining = $year['main_days'] - $usedDays['main'];
-            $additionalRemaining = $year['additional_days'] - $usedDays['additional'];
+        $employeeIds = [];
+        $employeeMap = [];
+        foreach ($employees as $emp) {
+            $id = $emp->getId();
+            $employeeIds[] = $id;
+            $employeeMap[$id] = $emp;
+        }
 
-            $remaining['details'][] = [
-                'year_number'          => $year['year_number'],
-                'period'               => $year['start_date']->format('d.m.Y') . ' - ' . $year['end_date']->format('d.m.Y'),
-                'main_total'           => $year['main_days'],
-                'additional_total'     => $year['additional_days'],
-                'total_total'          => $year['main_days'] + $year['additional_days'],
-                'main_used'            => $usedDays['main'],
-                'additional_used'      => $usedDays['additional'],
-                'total_used'           => $usedDays['main'] + $usedDays['additional'],
-                'main_remaining'       => $mainRemaining,
-                'additional_remaining' => $additionalRemaining,
-                'total_remaining'      => $mainRemaining + $additionalRemaining,
+        // 1. Загружаем все non-accrual periods одним запросом.
+        $allNonAccrualPeriods = $this->nonAccrualPeriodRepository->findByEmployees($employeeIds);
+
+        // 2. Для каждого сотрудника вычисляем рабочие годы.
+        // массив массивов {employeeId, yearStart, yearEnd}
+        $usedPeriodsAll = [];
+        foreach ($employeeIds as $id) {
+            $usedPeriodsAll += $this->getWorkYearList($employeeMap[$id], $currentDate);
+        }
+
+        // 3. Загружаем fixed additional days для всех (employeeId, yearStart) пар одним запросом.
+        $entitlementsMap = $this->vacationEntitlementRepository->getDaysForEmployeesOnDatesBatch($usedPeriodsAll);
+
+        // 4. Загружаем использованные дни для всех (employeeId, yearStart, yearEnd) пар одним запросом.
+        $usedDaysMap = $this->vacationDetailRepository->getUsedDaysByYearBatch($usedPeriodsAll);
+
+        // 5. Вычисляем остатки для каждого сотрудника.
+        $result = [];
+
+        foreach ($employeeIds as $id) {
+            $employee = $employeeMap[$id];
+            $usedPeriods = array_filter($usedPeriodsAll, fn($row) => $row['employeeId'] === $id);
+
+            $excludedPeriods = $allNonAccrualPeriods[$id] ?? [];
+
+            $mainTotal = 0;
+            $additionalTotal = 0;
+
+            $yearCounter = 1;
+            foreach ($usedPeriods as $usedPeriod) {
+                $entKey = $id . '|' . $usedPeriod['yearStart']->format('Y-m-d');
+                $fixedAdditionalDays = $entitlementsMap[$entKey] ?? 0;
+                $days = $this->getWorkYearDays(
+                    $employee,
+                    $yearCounter,
+                    $usedPeriod['cutoffDate'],
+                    $usedPeriod['yearStart'],
+                    $usedPeriod['yearEnd'],
+                    $excludedPeriods,
+                    $fixedAdditionalDays,
+                    false
+                );
+
+                // Используемые дни.
+                $usedKey = $id . '|' . $usedPeriod['yearStart']->format('Y-m-d') . '|' . $usedPeriod['yearEnd']->format('Y-m-d');
+                $usedDays = $usedDaysMap[$usedKey] ?? [
+                    'main'       => 0,
+                    'additional' => 0,
+                ];
+
+                $mainRemaining = max(0, $days['main_days'] - $usedDays['main']);
+                $additionalRemaining = max(0, $days['additional_days'] - $usedDays['additional']);
+
+                // Учитываем только годы, начавшиеся до cutoff.
+                if ($usedPeriod['cutoffDate'] >= $usedPeriod['yearStart']) {
+                    $mainTotal += $mainRemaining;
+                    $additionalTotal += $additionalRemaining;
+                }
+
+                $yearCounter++;
+            }// end foreach
+
+            $result[$id] = [
+                'main'       => $mainTotal,
+                'additional' => $additionalTotal,
+                'total'      => $mainTotal + $additionalTotal,
             ];
-
-            // Учитываем только текущий и прошлые годы.
-            if ($today >= $year['start_date']) {
-                $remaining['main'] += $mainRemaining;
-                $remaining['additional'] += $additionalRemaining;
-            }
         }// end foreach
 
-        $remaining['total'] = $remaining['main'] + $remaining['additional'];
-        return $remaining;
-    }// end getRemainingDays()
+        return $result;
+    }// end getRemainingDaysBatch()
 
     /**
      * Рассчитать использование отпускных дней

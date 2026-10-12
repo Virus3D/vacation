@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\VacationDetail;
+use DateTimeInterface;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -46,4 +47,53 @@ class VacationDetailRepository extends ServiceEntityRepository
 
         return $usedDays;
     }// end getUsedDaysByYear()
+
+    /**
+     * Загрузить использованные дни для нескольких сотрудников и периодов за один запрос.
+     *
+     * @param array<array{employeeId: int, yearStart: string, yearEnd: string}> $periods
+     *
+     * @return array<string, array<string, int>>  ключ "employeeId|yearStart|yearEnd" => ['main'=>N, 'additional'=>N]
+     */
+    public function getUsedDaysByYearBatch(array $periods): array
+    {
+        if ($periods === []) {
+            return [];
+        }
+
+        // Собираем уникальные employeeId для оптимизации.
+        $employeeIds = array_unique(array_column($periods, 'employeeId'));
+
+        // Загружаем все детали для этих сотрудников.
+        $qb = $this->createQueryBuilder('vd')
+            ->join('vd.vacation', 'v')
+            ->join('v.employee', 'e')
+            ->select('e.id AS employeeId', 'vd.workYearStart', 'vd.workYearEnd', 'vd.vacationType', 'SUM(vd.daysUsed) AS daysUsed')
+            ->andWhere('e.id IN (:employeeIds)')
+            ->setParameter('employeeIds', $employeeIds)
+            ->groupBy('e.id', 'vd.workYearStart', 'vd.workYearEnd', 'vd.vacationType');
+
+        $rows = $qb->getQuery()->getResult();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $ws = $row['workYearStart'] instanceof DateTimeInterface
+                ? $row['workYearStart']->format('Y-m-d')
+                : $row['workYearStart'];
+            $we = $row['workYearEnd'] instanceof DateTimeInterface
+                ? $row['workYearEnd']->format('Y-m-d')
+                : $row['workYearEnd'];
+
+            $key = $row['employeeId'] . '|' . $ws . '|' . $we;
+            if (!isset($result[$key])) {
+                $result[$key] = [
+                    'main'       => 0,
+                    'additional' => 0,
+                ];
+            }
+            $result[$key][$row['vacationType']] += (int) $row['daysUsed'];
+        }
+
+        return $result;
+    }// end getUsedDaysByYearBatch()
 }// end class

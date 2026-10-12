@@ -11,17 +11,27 @@
                 <th>ФИО</th>
                 <th>Дата приема</th>
                 <th>Дата увольнения</th>
+                <th>Остаток дней</th>
                 <th>Действия</th>
             </tr>
         </thead>
         <tbody>
             {% for employee in employees %}
+                {% set remaining = remainingDays[employee.id] ?? null %}
                 <tr>
                     <td>{{ employee.fullName }}</td>
                     <td>{{ employee.hireDate|date('d.m.Y') }}</td>
                     <td>
                         {% if employee.terminationDate %}
                             {{ employee.terminationDate|date('d.m.Y') }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if remaining is not null %}
+                            <span class="text-success fw-bold">{{ remaining.total }}</span>
+                            <span class="text-muted small">(осн. {{ remaining.main }} / доп. {{ remaining.additional }})</span>
                         {% else %}
                             <span class="text-muted">—</span>
                         {% endif %}
@@ -37,7 +47,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="4">Сотрудники не найдены. <a href="{{ path('app_employee_new') }}">Добавить первого сотрудника</a></td>
+                    <td colspan="5">Сотрудники не найдены. <a href="{{ path('app_employee_new') }}">Добавить первого сотрудника</a></td>
                 </tr>
             {% endfor %}
         </tbody>

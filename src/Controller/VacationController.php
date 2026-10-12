@@ -32,7 +32,6 @@ class VacationController extends AbstractController
         Request $request,
         VacationRepository $vacationRepository
     ): Response {
-        $remainingDays = $this->vacationManager->getRemainingDays($employee);
         $vacations = $vacationRepository->findByEmployeeOrderedByDate($employee->getId());
         $vacationDaysExcludingHolidays = [];
 
@@ -43,11 +42,24 @@ class VacationController extends AbstractController
 
         $workYears = $this->vacationManager->getWorkYears($employee);
         $workYearChoices = [];
+        $remainingTotal = [
+            'main'       => 0,
+            'additional' => 0,
+            'total'      => 0,
+        ];
         foreach ($workYears as $index => $wy) {
             $label = 'Год ' . $wy['year_number'] .
                 ' (' . $wy['start_date']->format('d.m.Y') . ' - ' . $wy['end_date']->format('d.m.Y') . ')';
             $workYearChoices[$label] = $index;
+
+            // Учитываем только годы, начавшиеся до cutoff.
+            if ($wy['cutoffDate'] >= $wy['start_date']) {
+                $remainingTotal['main'] += $wy['remaining']['main'];
+                $remainingTotal['additional'] += $wy['remaining']['additional'];
+            }
         }
+
+        $remainingTotal['total'] = $remainingTotal['main'] + $remainingTotal['additional'];
 
         $form = $this->createForm(
             VacationType::class,
@@ -133,7 +145,8 @@ class VacationController extends AbstractController
             'vacation/show.html.twig',
             [
                 'employee'                      => $employee,
-                'remainingDays'                 => $remainingDays,
+                'workYears'                     => $workYears,
+                'remainingTotal'                => $remainingTotal,
                 'vacations'                     => $vacations,
                 'form'                          => $form->createView(),
                 'calculationResult'             => $calculationResult,

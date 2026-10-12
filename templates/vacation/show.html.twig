@@ -29,7 +29,7 @@
         <div class="col-md-4">
             <div class="card stat-card">
                 <div class="card-body">
-                    <h3>{{ remainingDays.main }}</h3>
+                    <h3>{{ remainingTotal.main }}</h3>
                     <p class="text-muted">Основной отпуск</p>
                 </div>
             </div>
@@ -37,7 +37,7 @@
         <div class="col-md-4">
             <div class="card stat-card">
                 <div class="card-body">
-                    <h3>{{ remainingDays.additional }}</h3>
+                    <h3>{{ remainingTotal.additional }}</h3>
                     <p class="text-muted">Дополнительный отпуск</p>
                 </div>
             </div>
@@ -45,7 +45,7 @@
         <div class="col-md-4">
             <div class="card stat-card">
                 <div class="card-body">
-                    <h3>{{ remainingDays.total }}</h3>
+                    <h3>{{ remainingTotal.total }}</h3>
                     <p class="text-muted">Всего доступно</p>
                 </div>
             </div>
@@ -68,22 +68,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for detail in remainingDays.details %}
+                    {% for detail in workYears %}
                         <tr>
                             <td>{{ detail.year_number }}</td>
-                            <td>{{ detail.period }}</td>
+                            <td>{{ detail.start_date|date('d.m.Y') }} - {{ detail.end_date|date('d.m.Y') }}</td>
                             <td
-                                {% if detail.main_remaining > 0 %}class="text-success fw-bold"{% endif %}
-                                {% if detail.main_remaining < 0 %}class="text-danger fw-bold"{% endif %}
-                            >{{ detail.main_total }} / {{ detail.main_used }} / {{ detail.main_remaining }}</td>
+                                {% if detail.remaining.main > 0 %}class="text-success fw-bold"{% endif %}
+                                {% if detail.remaining.main < 0 %}class="text-danger fw-bold"{% endif %}
+                            >{{ detail.main_days }} / {{ detail.used.main }} / {{ detail.remaining.main }}</td>
                             <td
-                                {% if detail.additional_remaining > 0 %}class="text-success fw-bold"{% endif %}
-                                {% if detail.additional_remaining < 0 %}class="text-danger fw-bold"{% endif %}
-                            >{{ detail.additional_total }} / {{ detail.additional_used }} / {{ detail.additional_remaining }}</td>
+                                {% if detail.remaining.additional > 0 %}class="text-success fw-bold"{% endif %}
+                                {% if detail.remaining.additional < 0 %}class="text-danger fw-bold"{% endif %}
+                            >{{ detail.additional_days }} / {{ detail.used.additional }} / {{ detail.remaining.additional }}</td>
                             <td
-                                {% if detail.total_remaining > 0 %}class="text-success fw-bold"{% endif %}
-                                {% if detail.total_remaining < 0 %}class="text-danger fw-bold"{% endif %}
-                            >{{ detail.total_total }} / {{ detail.total_used }} / {{ detail.total_remaining }}</td>
+                                {% if detail.remaining.total > 0 %}class="text-success fw-bold"{% endif %}
+                                {% if detail.remaining.total < 0 %}class="text-danger fw-bold"{% endif %}
+                            >{{ detail.total_days }} / {{ detail.used.total }} / {{ detail.remaining.total }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

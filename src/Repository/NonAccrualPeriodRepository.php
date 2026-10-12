@@ -29,4 +29,32 @@ class NonAccrualPeriodRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }// end findByEmployee()
+
+    /**
+     * Загрузить все периоды непредоставления отпуска для нескольких сотрудников за один запрос.
+     *
+     * @param int[] $employeeIds
+     * @return array<int, NonAccrualPeriod[]>  ключ => employeeId, значение => список периодов
+     */
+    public function findByEmployees(array $employeeIds): array
+    {
+        if ($employeeIds === []) {
+            return [];
+        }
+
+        $periods = $this->createQueryBuilder('p')
+            ->andWhere('p.employee IN (:employeeIds)')
+            ->setParameter('employeeIds', $employeeIds)
+            ->orderBy('p.employee', 'ASC')
+            ->addOrderBy('p.startDate', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        $result = [];
+        foreach ($periods as $period) {
+            $result[$period->getEmployee()->getId()][] = $period;
+        }
+
+        return $result;
+    }// end findByEmployees()
 }// end class

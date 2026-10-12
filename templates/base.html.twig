@@ -56,12 +56,26 @@
         <!-- Русская локаль -->
         <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
         <script>
-            document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('DOMContentLoaded', function () {
                 flatpickr.localize(flatpickr.l10ns.ru);
                 flatpickr('.datepicker', {
                     dateFormat: 'd.m.Y',
                     allowInput: true,
                     locale: 'ru'
+                });
+
+                // Автоподстановка точек при ручном вводе дат (формат дд.мм.гггг)
+                document.addEventListener('input', function (e) {
+                    if (!e.target.classList.contains('datepicker')) return;
+                    var v = e.target.value.replace(/\D/g, '');
+                    if (v.length > 8) v = v.substring(0, 8);
+                    if (v.length >= 5) {
+                        e.target.value = v.substring(0, 2) + '.' + v.substring(2, 4) + '.' + v.substring(4);
+                    } else if (v.length >= 3) {
+                        e.target.value = v.substring(0, 2) + '.' + v.substring(2);
+                    } else if (v.length >= 1) {
+                        e.target.value = v;
+                    }
                 });
             });
         </script>
