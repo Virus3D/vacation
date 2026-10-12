@@ -263,7 +263,7 @@ class VacationManager
         // массив массивов {employeeId, yearStart, yearEnd}
         $usedPeriodsAll = [];
         foreach ($employeeIds as $id) {
-            $usedPeriodsAll += $this->getWorkYearList($employeeMap[$id], $currentDate);
+            $usedPeriodsAll = array_merge($usedPeriodsAll, $this->getWorkYearList($employeeMap[$id], $currentDate));
         }
 
         // 3. Загружаем fixed additional days для всех (employeeId, yearStart) пар одним запросом.
