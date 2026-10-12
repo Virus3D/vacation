@@ -26,17 +26,24 @@ class EmployeeController extends AbstractController
      * Главная страница.
      */
     #[Route('/', name: 'app_employee_index', methods: ['GET'])]
-    public function index(EmployeeRepository $employeeRepository): Response
+    public function index(EmployeeRepository $employeeRepository, Request $request): Response
     {
         $employees = $employeeRepository->findBy([], ['fullName' => 'ASC']);
 
-        $remainingDays = $this->vacationManager->getRemainingDaysBatch($employees, new DateTime());
+        $dateStr = $request->query->get('date', (new DateTime())->format('Y-m-d'));
+        $calcDate = DateTime::createFromFormat('Y-m-d', $dateStr);
+        if (!$calcDate) {
+            $calcDate = new DateTime();
+        }
+
+        $remainingDays = $this->vacationManager->getRemainingDaysBatch($employees, $calcDate);
 
         return $this->render(
             'employee/index.html.twig',
             [
                 'employees'     => $employees,
                 'remainingDays' => $remainingDays,
+                'selectedDate'  => $dateStr,
             ]
         );
     }// end index()
