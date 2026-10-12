@@ -33,12 +33,16 @@ class VacationManager
      *
      * @return array<array<mixed>>
      */
-    public function getWorkYears(Employee $employee, bool $allowAdvance = false): array
+    public function getWorkYears(Employee $employee, ?DateTimeInterface $current, bool $allowAdvance = false): array
     {
+        if ($current === null) {
+            $current = new DateTime();
+        }
+
         $allNonAccrualPeriods = $this->nonAccrualPeriodRepository->findByEmployees([$employee->getId()]);
         $excludedPeriods = $allNonAccrualPeriods[$employee->getId()] ?? [];
 
-        $yearsList = $this->getWorkYearList($employee, new DateTime());
+        $yearsList = $this->getWorkYearList($employee, $current);
 
         $usedDaysMap = $this->vacationDetailRepository->getUsedDaysByYearBatch($yearsList);
 
@@ -341,7 +345,7 @@ class VacationManager
         bool $allowAdvance = false
     ): array {
         $duration = $this->getVacationDaysCount($startDate, $endDate);
-        $workYears = $this->getWorkYears($employee, $allowAdvance);
+        $workYears = $this->getWorkYears($employee, allowAdvance: $allowAdvance);
         $usage = [];
         $daysToUse = $duration;
 
@@ -570,7 +574,7 @@ class VacationManager
         string $type,
         bool $allowAdvance = false
     ): int {
-        $workYears = $this->getWorkYears($employee, $allowAdvance);
+        $workYears = $this->getWorkYears($employee, allowAdvance: $allowAdvance);
         foreach ($workYears as $year) {
             if ($year['start_date'] == $yearStart && $year['end_date'] == $yearEnd) {
                 $usedDays = $this->vacationDetailRepository->getUsedDaysByYear(
@@ -595,90 +599,23 @@ class VacationManager
      */
     public function getAccruedDaysOnDate(Employee $employee, DateTimeInterface $date): array
     {
-        $hireDate = $employee->getHireDate();
-        $target = clone $date;
-
-        // Если дата раньше даты приёма – нет накоплений.
-        if ($target < $hireDate) {
-            return [
-                'main'       => 0,
-                'additional' => 0,
-                'total'      => 0,
-            ];
-        }
-
-        // Если целевая дата после увольнения — начислений нет.
-        if ($employee->isTerminated() && $date > $employee->getTerminationDate()) {
-            return [
-                'main'       => 0,
-                'additional' => 0,
-                'total'      => 0,
-            ];
-        }
-
-        $workYears = [];
-        $yearStart = clone $hireDate;
-        $yearCounter = 1;
-
-        while ($yearStart <= $target) {
-            $yearEnd = clone $yearStart;
-            $yearEnd->modify('+1 year');
-            $yearEnd->modify('-1 day');
-
-            $seniorityDays = min($yearCounter - 1, $employee->getMaxSeniorityAdditionalDays() ?? 10);
-            $fixedDays = $this->vacationEntitlementRepository->getDaysForEmployeeOnDate(
-                $employee->getId(),
-                min($yearStart, $target)
-            );
-
-            if ($yearEnd >= $target && $yearStart <= $target) {
-                // Текущий (незавершённый на дату) год.
-                $interval = $yearStart->diff($target);
-                $monthsWorked = ($interval->y * 12) + $interval->m;
-                $mainDays = (int) floor($employee->getBaseVacationDays() * $monthsWorked / 12);
-                $seniority = 0;
-                $fixed = (int) floor($fixedDays * $monthsWorked / 12);
-            } else {
-                // Завершённый год.
-                $mainDays = $employee->getBaseVacationDays();
-                $seniority = $seniorityDays;
-                $fixed = $fixedDays;
-            }
-
-            $workYears[] = [
-                'year_number'     => $yearCounter,
-                'start_date'      => clone $yearStart,
-                'end_date'        => clone $yearEnd,
-                'main_days'       => $mainDays,
-                'seniority_days'  => $seniority,
-                'fixed_days'      => $fixed,
-                'additional_days' => $seniority + $fixed,
-                'total_days'      => $mainDays + $seniority + $fixed,
-            ];
-
-            $yearStart->modify('+1 year');
-            $yearCounter++;
-        }// end while
-
-        $accrued = [
+        $workYears = $this->getWorkYears($employee, $date);
+        $remainingTotal = [
             'main'       => 0,
             'additional' => 0,
+            'total'      => 0,
         ];
-        foreach ($workYears as $year) {
-            $used = $this->vacationDetailRepository->getUsedDaysByYear(
-                $employee->getId(),
-                $year['start_date'],
-                $year['end_date']
-            );
-            $accrued['main'] += max(0, $year['main_days'] - $used['main']);
-            $accrued['additional'] += max(0, $year['additional_days'] - $used['additional']);
+        foreach ($workYears as $index => $wy) {
+            // Учитываем только годы, начавшиеся до cutoff.
+            if ($wy['cutoffDate'] >= $wy['start_date']) {
+                $remainingTotal['main'] += $wy['remaining']['main'];
+                $remainingTotal['additional'] += $wy['remaining']['additional'];
+            }
         }
 
-        return [
-            'main'       => $accrued['main'],
-            'additional' => $accrued['additional'],
-            'total'      => $accrued['main'] + $accrued['additional'],
-        ];
+        $remainingTotal['total'] = $remainingTotal['main'] + $remainingTotal['additional'];
+
+        return $remainingTotal;
     }// end getAccruedDaysOnDate()
 
     /**
