@@ -18,11 +18,6 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class VacationManager
 {
-    /**
-     * @var array<string, array<array<mixed>>> Кэш рабочих годов: employeeId|allowAdvance => workYears
-     */
-    private array $workYearsCache = [];
-
     public function __construct(
         private EntityManagerInterface $entityManager,
         private VacationDetailRepository $vacationDetailRepository,
@@ -49,21 +44,24 @@ class VacationManager
 
         $yearCounter = 1;
         foreach ($yearsList as $usedPeriod) {
-            $entKey = $employee->getId() . '|' . $usedPeriod['yearStart']->format('Y-m-d');
+            $yearStart = $usedPeriod['yearStart'];
+            $yearEnd = $usedPeriod['yearEnd'];
+
+            $entKey = $employee->getId() . '|' . $yearStart->format('Y-m-d');
             $fixedAdditionalDays = $entitlementsMap[$entKey] ?? 0;
             $days = $this->getWorkYearDays(
                 $employee,
                 $yearCounter,
                 $usedPeriod['cutoffDate'],
-                $usedPeriod['yearStart'],
-                $usedPeriod['yearEnd'],
+                $yearStart,
+                $yearEnd,
                 $excludedPeriods,
                 $fixedAdditionalDays,
                 $allowAdvance
             );
 
             // Используемые дни.
-            $usedKey = $employee->getId() . '|' . $usedPeriod['yearStart']->format('Y-m-d') . '|' . $usedPeriod['yearEnd']->format('Y-m-d');
+            $usedKey = $employee->getId() . '|' . $yearStart->format('Y-m-d') . '|' . $yearEnd->format('Y-m-d');
             $usedDays = $usedDaysMap[$usedKey] ?? [
                 'main'       => 0,
                 'additional' => 0,
@@ -71,8 +69,8 @@ class VacationManager
 
             $days['used'] = $usedDays;
             $days['remaining'] = [
-                'main'       => max(0, $days['main_days'] - $usedDays['main']),
-                'additional' => max(0, $days['additional_days'] - $usedDays['additional']),
+                'main'       => $days['main_days'] - $usedDays['main'],
+                'additional' => $days['additional_days'] - $usedDays['additional'],
             ];
             $days['used']['total'] = $days['used']['main'] + $days['used']['additional'];
 
@@ -286,31 +284,34 @@ class VacationManager
 
             $yearCounter = 1;
             foreach ($usedPeriods as $usedPeriod) {
-                $entKey = $id . '|' . $usedPeriod['yearStart']->format('Y-m-d');
+                $yearStart = $usedPeriod['yearStart'];
+                $yearEnd = $usedPeriod['yearEnd'];
+
+                $entKey = $id . '|' . $yearStart->format('Y-m-d');
                 $fixedAdditionalDays = $entitlementsMap[$entKey] ?? 0;
                 $days = $this->getWorkYearDays(
                     $employee,
                     $yearCounter,
                     $usedPeriod['cutoffDate'],
-                    $usedPeriod['yearStart'],
-                    $usedPeriod['yearEnd'],
+                    $yearStart,
+                    $yearEnd,
                     $excludedPeriods,
                     $fixedAdditionalDays,
                     false
                 );
 
                 // Используемые дни.
-                $usedKey = $id . '|' . $usedPeriod['yearStart']->format('Y-m-d') . '|' . $usedPeriod['yearEnd']->format('Y-m-d');
+                $usedKey = $id . '|' . $yearStart->format('Y-m-d') . '|' . $yearEnd->format('Y-m-d');
                 $usedDays = $usedDaysMap[$usedKey] ?? [
                     'main'       => 0,
                     'additional' => 0,
                 ];
 
-                $mainRemaining = max(0, $days['main_days'] - $usedDays['main']);
-                $additionalRemaining = max(0, $days['additional_days'] - $usedDays['additional']);
+                $mainRemaining = $days['main_days'] - $usedDays['main'];
+                $additionalRemaining = $days['additional_days'] - $usedDays['additional'];
 
                 // Учитываем только годы, начавшиеся до cutoff.
-                if ($usedPeriod['cutoffDate'] >= $usedPeriod['yearStart']) {
+                if ($usedPeriod['cutoffDate'] >= $yearStart) {
                     $mainTotal += $mainRemaining;
                     $additionalTotal += $additionalRemaining;
                 }
