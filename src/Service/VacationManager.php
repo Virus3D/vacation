@@ -33,7 +33,7 @@ class VacationManager
      *
      * @return array<array<mixed>>
      */
-    public function getWorkYears(Employee $employee, ?DateTimeInterface $current, bool $allowAdvance = false): array
+    public function getWorkYears(Employee $employee, ?DateTimeInterface $current = null, bool $allowAdvance = false): array
     {
         if ($current === null) {
             $current = new DateTime();
