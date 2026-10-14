@@ -45,6 +45,7 @@ class VacationManager
         $yearsList = $this->getWorkYearList($employee, $current);
 
         $usedDaysMap = $this->vacationDetailRepository->getUsedDaysByYearBatch($yearsList);
+        $entitlementsMap = $this->vacationEntitlementRepository->getDaysForEmployeesOnDatesBatch($yearsList);
 
         $yearCounter = 1;
         foreach ($yearsList as $usedPeriod) {
